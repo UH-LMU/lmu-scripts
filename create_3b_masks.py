@@ -49,7 +49,7 @@ def main():
         #print i,  roiX,  roiY,  nx[i],  ny[i],  dx,  dy
         ratio = 1 - min(dx, dy)/max(dx, dy)
         print i,  nx[i],  ny[i],  dx,  dy,  ratio,  minratio
-        if ratio < minratio:
+        if ratio < minratio and nx[i]*ny[i] == N:
             minratio = ratio
             imin = i
     
