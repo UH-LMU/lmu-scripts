@@ -33,14 +33,14 @@ def main():
     
     
     for i in range(0, processors):
-        save_spots = "--save_spots %s/%s%d-%d.txt" % (results_dir,  results,  i, rerun)
+        save_spots = "%s/%s%d-%d.txt" % (results_dir,  results,  i, rerun)
         mask = "--log_ratios %s/%s%d.bmp" % (masks_dir,  masks,  i)
         load_checkpoint = ""
         if rerun:
             previous = string.replace(save_spots, '-'+str(rerun),  '-'+str(rerun -1))
             load_checkpoint = "--load_checkpoint " + previous
             
-        line = "%d     %s %s %s %s %s" % (i,  prog, load_checkpoint,  save_spots,  mask,  data)
+        line = "%d     %s %s --save_spots %s %s %s" % (i,  prog, load_checkpoint,  save_spots,  mask,  data)
 
         print line
         
