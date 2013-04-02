@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 from math import sqrt
 from math import floor
 from math import ceil
@@ -30,7 +31,6 @@ def main():
     overlap = int(options.overlap)
     format = 'gif'
 
-    nx = range(1,  round(sqrt(N))+1)
     nx = range(1,  N+1)
     print nx
     
@@ -61,70 +61,53 @@ def main():
     dy = int(floor(roiY / ny))
     print dx,  dy
     print dx*nx,  dy*ny
-    
-    # add three pixels for overlapping boundaries
-    rectx = dx + overlap
-    recty = dy + overlap
-    
+        
     filename = 'convert_3b.sh'
     file = open(filename,  'w')
     
-    #'-colorspace','Gray',
-    composite = 'mask_sum.' + format
-    cmd = ['convert', '-size', str(dataX)+'x'+str(dataY), 'xc:white', composite]
+    composite_small = 'mask_small_sum.' + format
+    composite_large = 'mask_large_sum.' + format
+    cmd = ['convert', '-size', str(dataX)+'x'+str(dataY), 'xc:white', composite_small]
     print >> file, ' '.join(cmd)
-    border = 'border.' + format
-    cmd = ['convert', '-size', str(dataX)+'x'+str(dataY), 'xc:black', '-stroke','skyblue', '-fill','skyblue', \
-                '-draw','\"rectangle '+str(x0)+','+str(y0)+ ' '+str(x0 + overlap)+','+str(y0 + roiY)+'\"',   \
-                '-draw','\"rectangle '+str(x0)+','+str(y0)+ ' '+str(x0 + roiX)+','+str(y0 + overlap)+'\"',   \
-                '-draw','\"rectangle '+str(x0+roiX-overlap)+','+str(y0)+ ' '+str(x0+roiX)+','+str(y0 + roiY)+'\"',   \
-                '-draw','\"rectangle '+str(x0)+','+str(y0+roiY-overlap)+ ' '+str(x0 + roiX)+','+str(y0 + roiY)+'\"',  border ]
-    print >> file, ' '.join(cmd)
-    cmd = ['composite', composite, '-compose',  'minus',  border,   composite]
-    print >> file, ' '.join(cmd)
-    
-    composite_roi = 'mask_sum_roi.' + format
-    cmd = ['convert', '-size', str(roiX)+'x'+str(roiY), 'xc:white', composite_roi]
-    print >> file, ' '.join(cmd)
-    border_roi = 'border_roi.' + format
-    cmd = ['convert', '-size', str(roiX)+'x'+str(roiY), 'xc:black', '-stroke','skyblue', '-fill','skyblue', \
-                '-draw','\"rectangle '+str(0)+','+str(0)+ ' '+str(overlap)+','+str(roiY)+'\"',   \
-                '-draw','\"rectangle '+str(0)+','+str(0)+ ' '+str(roiX)+','+str(overlap)+'\"',   \
-                '-draw','\"rectangle '+str(roiX-overlap)+','+str(0)+ ' '+str(roiX)+','+str(roiY)+'\"',   \
-                '-draw','\"rectangle '+str(0)+','+str(roiY-overlap)+ ' '+str(roiX)+','+str(roiY)+'\"',  border_roi ]
-    print >> file, ' '.join(cmd)
-    cmd = ['composite', composite_roi, '-compose',  'minus',  border_roi,   composite_roi]
+    cmd = ['convert', '-size', str(dataX)+'x'+str(dataY), 'xc:white', composite_large]
     print >> file, ' '.join(cmd)
     
     for i in range(0, nx):
         for j in range(0, ny):
             startx = x0 + i*dx
             starty = y0 + j*dy
-            endx = x0 + i*dx + rectx
-            endy = y0 + j*dy + recty
-            
-            maskname = 'mask'+str(i*(nx-1)+j)
-            mask = maskname +'.'+ format 
-            cmd = ['convert', '-size', str(dataX)+'x'+str(dataY), 'xc:black', '-stroke','skyblue', '-fill','skyblue', '-draw','\"rectangle '+str(startx)+','+str(starty)+ ' '+str(endx)+','+str(endy)+'\"',  mask ]
-            print >> file, ' '.join(cmd) 
-            cmd = ['composite', composite, '-compose',  'minus',  mask,   composite]
-            print >> file, ' '.join(cmd)
-            cmd = ['convert', '-threshold',  '0.5',  mask,   maskname + '.bmp']
-            print >> file, ' '.join(cmd)
-            
-            print >> file, 'rm ' + mask    
-    
-            startx = 0 + i*dx
-            starty = 0 + j*dy
-            endx = 0 + i*dx + rectx
-            endy = 0 + j*dy + recty
+            endx = startx + dx
+            endy = starty + dy
+            print i,  j,  startx,  endx,  starty,  endy
 
-            mask_roi = 'mask_roi'+str(i*nx+j)+'.'+ format 
-            cmd = ['convert', '-size', str(roiX)+'x'+str(roiY), 'xc:black', '-stroke','skyblue', '-fill','skyblue', '-draw','\"rectangle '+str(startx)+','+str(starty)+ ' '+str(endx)+','+str(endy)+'\"',  mask_roi ]
+            startx_L = x0 + i*dx - overlap
+            starty_L = y0 + j*dy - overlap
+            endx_L = startx + dx + overlap
+            endy_L = starty + dy + overlap
+            print i,  j,  startx_L,  endx_L,  starty_L,  endy_L
+            
+            index = str(i*int(ny)+j)
+            maskname_small = 'mask_small'+ index
+            mask_small = maskname_small +'.'+ format 
+            maskname_large = 'mask_large'+index
+            mask_large = maskname_large +'.'+ format 
+            cmd = ['convert', '-size', str(dataX)+'x'+str(dataY), 'xc:black', '-stroke','skyblue', '-fill','skyblue', '-draw','\"rectangle '+str(startx)+','+str(starty)+ ' '+str(endx)+','+str(endy)+'\"',  mask_small ]
             print >> file, ' '.join(cmd) 
-            cmd = ['composite', composite_roi, '-compose',  'minus',  mask_roi,   composite_roi]
+            cmd = ['convert', '-size', str(dataX)+'x'+str(dataY), 'xc:black', '-stroke','skyblue', '-fill','skyblue', '-draw','\"rectangle '+str(startx_L)+','+str(starty_L)+ ' '+str(endx_L)+','+str(endy_L)+'\"',  mask_large ]
+            print >> file, ' '.join(cmd) 
+            cmd = ['composite', composite_small, '-compose',  'minus',  mask_small,   composite_small]
             print >> file, ' '.join(cmd)
-    
+            cmd = ['composite', composite_large, '-compose',  'minus',  mask_large,   composite_large]
+            print >> file, ' '.join(cmd)
+            
+            cmd = ['convert', '-threshold',  '0.5',  mask_small,   maskname_small + '.bmp']
+            print >> file, ' '.join(cmd)
+            cmd = ['convert', '-threshold',  '0.5',  mask_large,   maskname_large + '.bmp']
+            print >> file, ' '.join(cmd)
+            
+            print >> file, 'rm ' + mask_small    
+            print >> file, 'rm ' + mask_large    
+        
     file.close()
     os.system('chmod a+rx ' + filename)
     #subprocess.call(filename)    
