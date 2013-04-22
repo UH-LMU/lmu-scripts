@@ -50,6 +50,8 @@ dialog.addNumericField("Pixel (nm)", 100,0,5,"")
 #dialog.addStringField("Name of job for high resolution scan", DefaultJobHigh)
 dialog.addMessage("Number of processors")
 dialog.addNumericField("N", N,0,5,"")
+dialog.addMessage("Root directory")
+dialog.addStringField("Root", "$WRKDIR/3B/runs/")
 #dialog.addStringField("Name of job for high resolution scan", DefaultJobHigh)
 #dialog.addMessage("Scans")
 #dialog.addCheckbox("Perform low resolution scan?", 0)
@@ -63,7 +65,7 @@ FWHM_nm = float(dialog.getNextNumber())
 pixel_nm = float(dialog.getNextNumber())
 N = int(dialog.getNextNumber())
 #LasafPort = dialog.getNextNumber()
-#JobHigh = dialog.getNextString()
+root = dialog.getNextString()
 
 initial_spots = int(float(roi.width) * float(roi.height) / float(10) / float(N))
 
@@ -81,19 +83,19 @@ if dialog.wasCanceled():
 t = time.time()
 ft = datetime.datetime.fromtimestamp(t).strftime('%Y%m%d-%H%M%S')
 imgDir = IJ.getDirectory("image")
-runDir = imgDir + title + "_3B_N" + str(N) + "_" + ft + "/"
-print runDir
-os.mkdir(runDir)
+runDir = title + "_3B_N" + str(N) + "_" + ft + "/"
+print imgDir + runDir
+os.mkdir(imgDir + runDir)
 
 # create output directories
-maskDir = runDir + "masks/"
+maskDir = imgDir + runDir + "masks/"
 os.mkdir(maskDir)
-os.mkdir(runDir + "coordinates")
-os.mkdir(runDir + "output")
-os.mkdir(runDir + "results")
+os.mkdir(imgDir + runDir + "coordinates")
+os.mkdir(imgDir + runDir + "output")
+os.mkdir(imgDir + runDir + "results")
 
 # prepare log file
-setupLogName = runDir+"setup_parallel.log"
+setupLogName = imgDir + runDir+"setup_parallel.log"
 setupLog = open(setupLogName,"w")
 
 # define mask grid
@@ -115,17 +117,17 @@ ratio_roi = float(roi.width) / float(roi.height)
 ratio_diff_min = 99999999999
 for i in range(1,N+1):
 	for j in range(1,N+1):
-		ratio_N = float(1) / float(j)
+		ratio_N = float(i) / float(j)
 		ratio_diff = abs(ratio_N - ratio_roi)
-		print ratio_diff
 		if i*j == N and ratio_diff < ratio_diff_min:
-			print "improved"
+			print i, j, i*j, ratio_roi, ratio_N, ratio_diff
+			#print "improved"
 			ratio_diff_min = ratio_diff
 			nx = int(i) 
 			ny = int(j)
 
-dx = ceil(float(roi.x)/float(nx))
-dy = ceil(float(roi.y)/float(ny))
+dx = ceil(float(roi.width)/float(nx))
+dy = ceil(float(roi.height)/float(ny))
 
 print >> setupLog, "ROI bounds: %d, %d, %d, %d" % (roi.x, roi.y, roi.width, roi.height)
 print >> setupLog, "ROI size: %d" % (roi.width * roi.height)
@@ -154,12 +156,26 @@ maxProj.close()
 print
 
 # create masks
-#IJ.setBackgroundColor(0,0,0)
-#IJ.setForegroundColor(255,255,255)
+IJ.setBackgroundColor(0,0,0)
+IJ.setForegroundColor(50,50,50)
 #roiObj.setDefaultFillColor(Color(int(1),int(1),int(1)))
+#roiObj.setDefaultFillColor(Color(int(0),int(0),int(0)))
+
 
 IJ.newImage("mask_small_sum", "8-bit", dataWidth, dataHeight, N)
 sumSmall = IJ.getImage()
+for i in xrange(1, sumSmall.getStack().getSize() + 1):
+  # ip is the ImageProcessor for one stack slice
+  ip = sumSmall.getStack().getProcessor(i)
+  ip.multiply(0)
+  
+IJ.newImage("mask_large_sum", "8-bit", dataWidth, dataHeight, N)
+sumLarge = IJ.getImage()
+for i in xrange(1, sumLarge.getStack().getSize() + 1):
+  # ip is the ImageProcessor for one stack slice
+  ip = sumLarge.getStack().getProcessor(i)
+  ip.multiply(0)
+ 
 
 calc = ImageCalculator()
 for i in range(0,nx):
@@ -167,30 +183,120 @@ for i in range(0,nx):
 		index = int(i*ny + j) + 1
 		startx = roi.x + i*dx
 		starty = roi.y + j*dy
-		print >> setupLog, "mask %d: %d, %d" % (index, startx, starty)
+		print >> setupLog, "mask %d: %d, %d, %d, %d" % (index, startx, starty,dx,dy)
 		
-		roiMask = Roi(startx,starty,roi.width,roi.height)
+		maskRoi = Roi(startx,starty,dx,dy)
 		mask = IJ.createImage("mask_small_" + str(index), "8-bit", dataWidth, dataHeight, 1)
-		mask.setRoi(roiMask, False)
-		IJ.run(mask,"Fill", "")
-		#mask = IJ.getImage()
-		#IJ.run(mask,"Convert to Mask", "")
-		#mask = IJ.getImage()
-		#IJ.run(mask,"Invert", "")
+
+		# set all pixels to 0
+		mask.getProcessor().multiply(0)
+		mask.setRoi(maskRoi, True)
+		mask.getProcessor().setValue(50)
+		mask.getProcessor().fill(maskRoi)
+
 		IJ.saveAs(mask,"jpg",maskDir + mask.getTitle())
 
-		sumSmall.getImageStack().setPixels(mask.getProcessor().getPixels(), index)
+		#print "set sum small slice index", sumSmall.getImageStack().getSize(), index
+		sumSmall.getImageStack().setPixels(mask.getProcessor().getPixelsCopy(), index)
+
+		#mask.getProcessor().dilate()
+		#mask.getProcessor().fill(maskRoi)
+		#mask.getProcessor().dilate()
+		#mask.getProcessor().fill(maskRoi)
+		#mask.getProcessor().dilate()
+		#mask.getProcessor().fill(maskRoi)
+		mask.getProcessor().erode()
+		mask.getProcessor().erode()
+		mask.getProcessor().erode()
+		
+		IJ.saveAs(mask,"jpg",maskDir + "mask_large_" + str(index))
+		
+		sumLarge.getImageStack().setPixels(mask.getProcessor().getPixelsCopy(), index)
 		
 		mask.close()
 
 		#waitUser("check...")
 
 IJ.run(sumSmall,"Z Project...","start=1 stop="+str(N) +" projection=[Sum Slices]")
-sumSmall = IJ.getImage()
-IJ.saveAs(sumSmall,"jpg",maskDir + sumSmall.getTitle())
+sumSmallProj = IJ.getImage()
+IJ.saveAs(sumSmallProj,"jpg",maskDir + sumSmall.getTitle())
 
-#sumSmall.close()
-#sumLarge.close()
+IJ.run(sumLarge,"Z Project...","start=1 stop="+str(N) +" projection=[Sum Slices]")
+sumLargeProj = IJ.getImage()
+IJ.saveAs(sumLargeProj,"jpg",maskDir + sumLarge.getTitle())
+
+sumSmall.close()
+sumSmallProj.close()
+sumLarge.close()
+sumLargeProj.close()
 
 setupLog.close()
 
+# prepare batch file
+batchName = imgDir + runDir+"batch_vuori.sh"
+batch = open(batchName,"w")
+print >> batch, "#!/bin/csh"
+print >> batch, "#SBATCH -J 3B-"+ ft
+print >> batch, "#SBATCH -e output/my_output_err_%j"
+print >> batch, "#SBATCH -o output/my_output_%j"
+print >> batch, ""
+print >> batch, "#SBATCH --mem-per-cpu=1000"
+print >> batch, "#SBATCH -t 01:00:00"
+print >> batch, "#SBATCH -n 1"
+print >> batch, ""
+print >> batch, "set rundir=" + root + runDir
+print >> batch, "cd ${rundir}"
+print >> batch, ""
+print >> batch, "set rerun=0"
+print >> batch, ""
+print >> batch, "set results=${rundir}/results/results$VUORI_JOBINDEX-${rerun}.txt"
+print >> batch, "set mask=${rundir}/masks/mask_small_$VUORI_JOBINDEX.jpg"
+print >> batch, "set data=${rundir}/../" + imp.getTitle()
+print >> batch, ""
+print >> batch, "module swap PrgEnv-pgi PrgEnv-gnu/4.7.1"
+print >> batch, "setenv LD_LIBRARY_PATH ${LD_LIBRARY_PATH}:/v/users/hajaalin/3B/build-gnu/lib"
+print >> batch, ""
+print >> batch, "/wrk/hajaalin/3B/multispot5_headless  --save_spots ${results} --log_ratios ${mask} ${data}"
+print >> batch, ""
+batch.close()
+
+# prepare config file
+configName = imgDir + runDir + "multispot5.cfg"
+config = open(configName, "w")
+
+print >> config, "A=[0.16 0.84 0; 0.495 0.495 0.01; 0 0 1]"
+print >> config, "pi=[.5 .5 0]"
+print >> config, "add_remove.hessian.inner_samples=1000"
+print >> config, "add_remove.hessian.outer_samples=100"
+print >> config, "add_remove.optimizer.attempts=10"
+print >> config, "add_remove.optimizer.hessian_inner_samples=1000"
+print >> config, "add_remove.optimizer.samples=20"
+print >> config, "add_remove.thermo.samples=1000"
+print >> config, "add_remove.tries=10"
+print >> config, "blur.mu=" + str(blur_mu)
+print >> config, "blur.sigma=1.00000000000000005551e-01"
+print >> config, "cg.max_motion=5.00000000000000000000e-01"
+print >> config, "edge=1000"
+print >> config, "gibbs.mixing_iterations=1"
+print >> config, "intensity.rel_mu=2.00000000000000000000e+00"
+print >> config, "intensity.rel_sigma=1.00000000000000000000e+00"
+print >> config, "main.cg.max_iterations=5.00000000000000000000e+00"
+print >> config, "main.gibbs.samples=10"
+print >> config, "main.passes=4"
+print >> config, "main.total_iterations=100000000"
+print >> config, "max_motion.use_brightness_std=1"
+print >> config, 'mode="new"'
+print >> config, 'placement="intensity_sampled"'
+print >> config, "placement.uniform.num_spots=" + str(initial_spots)
+print >> config, "position.extra_radius=2.29999999999999982236e+00"
+print >> config, "position.use_prior=1"
+print >> config, "preprocess.lpf=5.00000000000000000000e+00"
+print >> config, "preprocess.skip=0"
+print >> config, "seed=9121164"
+print >> config, "//Unmatched tags:"
+print >> config, "cluster_to_show=19"
+print >> config, "preprocess.fixed_scaling=0"
+print >> config, "radius=0"
+print >> config, "threshold=0"
+print >> config, "use_largest=1"
+config.close()
