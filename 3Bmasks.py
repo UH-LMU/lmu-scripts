@@ -50,12 +50,14 @@ dialog.addNumericField("Pixel (nm)", 100,0,5,"")
 #dialog.addStringField("Name of job for high resolution scan", DefaultJobHigh)
 dialog.addMessage("Number of processors")
 dialog.addNumericField("N", N,0,5,"")
+dialog.addMessage("Compute host")
+dialog.addStringField("host", "vuori.csc.fi")
 dialog.addMessage("Root directory")
 dialog.addStringField("Root", "$WRKDIR/3B/runs/")
 #dialog.addStringField("Name of job for high resolution scan", DefaultJobHigh)
 #dialog.addMessage("Scans")
 #dialog.addCheckbox("Perform low resolution scan?", 0)
-dialog.setSize(400,600)
+dialog.setSize(1000,800)
 dialog.showDialog()
 
 # Recover parameters from dialog box
@@ -65,7 +67,9 @@ FWHM_nm = float(dialog.getNextNumber())
 pixel_nm = float(dialog.getNextNumber())
 N = int(dialog.getNextNumber())
 #LasafPort = dialog.getNextNumber()
-root = dialog.getNextString()
+host = dialog.getNextString()
+root = dialog.getNextString() + "/"
+rootSCP = root.replace("$",":")
 
 initial_spots = int(float(roi.width) * float(roi.height) / float(10) / float(N))
 
@@ -90,6 +94,8 @@ os.mkdir(imgDir + runDir)
 # create output directories
 maskDir = imgDir + runDir + "masks/"
 os.mkdir(maskDir)
+scriptDir = imgDir + runDir + "scripts/"
+os.mkdir(scriptDir)
 os.mkdir(imgDir + runDir + "coordinates")
 os.mkdir(imgDir + runDir + "output")
 os.mkdir(imgDir + runDir + "results")
@@ -176,6 +182,11 @@ for i in xrange(1, sumLarge.getStack().getSize() + 1):
   ip = sumLarge.getStack().getProcessor(i)
   ip.multiply(0)
  
+#trimmerName = runDir + "trim_coordinates" + str(index) + ".sh"
+#trimmer = open(trimmerName, 'w')
+
+#iterCheckName = runDir + "check_iterations.sh"
+#iterCheck = open(iterCheckName)
 
 calc = ImageCalculator()
 for i in range(0,nx):
@@ -184,6 +195,13 @@ for i in range(0,nx):
 		startx = roi.x + i*dx
 		starty = roi.y + j*dy
 		print >> setupLog, "mask %d: %d, %d, %d, %d" % (index, startx, starty,dx,dy)
+
+		roiLogName = maskDir + "mask_small_" + str(index) + "_roi.txt"
+		roiLog = open(roiLogName, 'w')
+		print >> roiLog, "%d, %d, %d, %d" % (startx, starty,dx,dy)
+		roiLog.close()
+
+		#print >> trimmer, "./scripts/3Bcoords.py %s %d,%d,%d,%d" % ()
 		
 		maskRoi = Roi(startx,starty,dx,dy)
 		mask = IJ.createImage("mask_small_" + str(index), "8-bit", dataWidth, dataHeight, 1)
@@ -233,7 +251,7 @@ sumLargeProj.close()
 setupLog.close()
 
 # prepare batch file
-batchName = imgDir + runDir+"batch_vuori.sh"
+batchName = scriptDir + "batch_vuori.sh"
 batch = open(batchName,"w")
 print >> batch, "#!/bin/csh"
 print >> batch, "#SBATCH -J 3B-"+ ft
@@ -261,8 +279,8 @@ print >> batch, ""
 batch.close()
 
 # prepare config file
-configName = imgDir + runDir + "multispot5.cfg"
-config = open(configName, "w")
+name = imgDir + runDir + "multispot5.cfg"
+config = open(name, "w")
 
 print >> config, "A=[0.16 0.84 0; 0.495 0.495 0.01; 0 0 1]"
 print >> config, "pi=[.5 .5 0]"
@@ -300,3 +318,78 @@ print >> config, "radius=0"
 print >> config, "threshold=0"
 print >> config, "use_largest=1"
 config.close()
+
+
+# prepare script for trimming coordinate files
+name = scriptDir + "trim_coordinates.py"
+file = open(name,'w')
+
+print >> file, "import os.path"
+print >> file, "import sys"
+print >> file, ""
+print >> file, "filename = sys.argv[1]"
+print >> file, "file = open(filename, 'r')"
+print >> file, "lines = file.readlines()"
+print >> file, "file.close()"
+print >> file, ""
+print >> file, "box = sys.argv[2]"
+print >> file, "(x0,y0,width,height) = box.split(',')"
+print >> file, "x0 = float(x0)"
+print >> file, "y0 = float(y0)"
+print >> file, "width = float(width)"
+print >> file, "height = float(height)"
+print >> file, "print x0,y0,width,height"
+print >> file, ""
+print >> file, "(root,ext) = os.path.splitext(filename)"
+print >> file, "filename = root + '_trimmed' + ext"
+print >> file, "print filename"
+print >> file, "file = open(filename, 'w')"
+print >> file, ""
+print >> file, "for l in lines:"
+print >> file, "    (x,y,z) = l.split()"
+print >> file, "    x = float(x)"
+print >> file, "    y = float(y)"
+print >> file, "    z = float(z)"
+print >> file, ""
+print >> file, "    if x0 < x and x < (x0+width) and y0 < y and y < (y0+height):"
+print >> file, "        print >> file, x, y, z"
+print >> file, ""
+print >> file, "file.close()"
+print >> file, ""
+file.close()
+
+
+# prepare script for parsing coordinates
+name = scriptDir + "orgDataLocal.sh"
+file = open(name,'w')
+
+print >> file, "#!/bin/bash"
+print >> file, "datapath=$(ls ./results)"
+print >> file, "for af in $datapath"
+print >> file, "do"
+print >> file, "        of='./coordinates/cor_'$af "
+print >> file, "        awk '/PASS/{for(i=2; i<=NF; i+=4 ) print $(i+2), $(i+3), $i}' './results/'$af > $of"
+print >> file, "done"
+file.close()
+
+# prepare script for checking iterations
+name = scriptDir + "checkIterations.sh"
+file = open(name, 'w')
+print >> file, "for f in results/*.txt; do echo $f; grep PASS $f | wc -l; echo; done"
+file.close()
+
+# prepare script for starting on Vuori
+name = scriptDir + "start_vuori.sh"
+file = open(name, 'w')
+print >> file, "array_sbatch -file scripts/batch_vuori.sh -from 1 -to " + str(N)
+file.close()
+
+# prepare script for copying data to vuori
+name = scriptDir + "ssh_start_vuori.sh"
+file = open(name, 'w')
+print >> file, "ssh " + host + " 'mkdir -p " + root + "'"
+print >> file, "rsync -acv " + imgDir + " " + host + rootSCP
+print >> file, "ssh " + host + " 'cd " + root + runDir + "; scripts/start_vuori.sh'"
+file.close()
+
+os.system("chmod u+x " + scriptDir + "*")
