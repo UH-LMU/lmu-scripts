@@ -46,14 +46,14 @@ dialog = GenericDialog("ThreeB parallel setup")
 dialog.addMessage("Microscope FWHM")
 dialog.addNumericField("FWHM (nm)", 250,0,5,"")
 dialog.addMessage("Pixel size")
-dialog.addNumericField("Pixel (nm)", 100,0,5,"")
+dialog.addNumericField("Pixel (nm)", 66,0,5,"")
 #dialog.addStringField("Name of job for high resolution scan", DefaultJobHigh)
 dialog.addMessage("Number of processors")
 dialog.addNumericField("N", N,0,5,"")
 dialog.addMessage("Compute host")
 dialog.addStringField("host", "vuori.csc.fi")
 dialog.addMessage("Root directory")
-dialog.addStringField("Root", "$WRKDIR/3B/runs/")
+dialog.addStringField("Root", "$WRKDIR/3B/runs/actin_stuff")
 #dialog.addStringField("Name of job for high resolution scan", DefaultJobHigh)
 #dialog.addMessage("Scans")
 #dialog.addCheckbox("Perform low resolution scan?", 0)
@@ -113,7 +113,7 @@ def isprime(n):
             return False
     return True
 
-if isprime(N):
+if N > 5 and isprime(N):
 	print >> setupLog, "Prime number of processors, adding one..."
 	N = N+1
 
@@ -188,66 +188,63 @@ for i in xrange(1, sumLarge.getStack().getSize() + 1):
 #iterCheckName = runDir + "check_iterations.sh"
 #iterCheck = open(iterCheckName)
 
+roiLogName = maskDir + "mask_small_rois.txt"
+roiLog = open(roiLogName, 'w')
+
 calc = ImageCalculator()
 for i in range(0,nx):
 	for j in range(0,ny):
 		index = int(i*ny + j) + 1
 		startx = roi.x + i*dx
 		starty = roi.y + j*dy
-		print >> setupLog, "mask %d: %d, %d, %d, %d" % (index, startx, starty,dx,dy)
+		print >> setupLog, "mask_small_%d %d,%d,%d,%d" % (index, startx, starty,dx,dy)
+		print >> roiLog, "%d,%d,%d,%d,%d" % (index, startx, starty,dx,dy)
 
-		roiLogName = maskDir + "mask_small_" + str(index) + "_roi.txt"
-		roiLog = open(roiLogName, 'w')
-		print >> roiLog, "%d, %d, %d, %d" % (startx, starty,dx,dy)
-		roiLog.close()
+		#print >> trimmer, "scripts/trim_coordinates.py %s %d,%d,%d,%d" % ()
 
-		#print >> trimmer, "./scripts/3Bcoords.py %s %d,%d,%d,%d" % ()
-		
+		# create small masks that fill the ROI exactly
 		maskRoi = Roi(startx,starty,dx,dy)
 		mask = IJ.createImage("mask_small_" + str(index), "8-bit", dataWidth, dataHeight, 1)
-
-		# set all pixels to 0
 		mask.getProcessor().multiply(0)
 		mask.setRoi(maskRoi, True)
 		mask.getProcessor().setValue(50)
 		mask.getProcessor().fill(maskRoi)
 
 		IJ.saveAs(mask,"jpg",maskDir + mask.getTitle())
-
-		#print "set sum small slice index", sumSmall.getImageStack().getSize(), index
 		sumSmall.getImageStack().setPixels(mask.getProcessor().getPixelsCopy(), index)
-
-		#mask.getProcessor().dilate()
-		#mask.getProcessor().fill(maskRoi)
-		#mask.getProcessor().dilate()
-		#mask.getProcessor().fill(maskRoi)
-		#mask.getProcessor().dilate()
-		#mask.getProcessor().fill(maskRoi)
-		mask.getProcessor().erode()
-		mask.getProcessor().erode()
-		mask.getProcessor().erode()
-		
-		IJ.saveAs(mask,"jpg",maskDir + "mask_large_" + str(index))
-		
-		sumLarge.getImageStack().setPixels(mask.getProcessor().getPixelsCopy(), index)
-		
 		mask.close()
+
+
+		# create dilated masks that will be used for processing
+		dilate = 4
+		maskRoiLarge = Roi(startx-dilate, starty-dilate, dx+2*dilate, dy+2*dilate)
+		maskLarge = IJ.createImage("mask_large_" + str(index), "8-bit", dataWidth, dataHeight, 1)
+		maskLarge.getProcessor().multiply(0)
+		maskLarge.setRoi(maskRoi, True)
+		maskLarge.getProcessor().setValue(50)
+		maskLarge.getProcessor().fill(maskRoiLarge)
+		
+		IJ.saveAs(maskLarge,"jpg",maskDir + "mask_large_" + str(index))
+		sumLarge.getImageStack().setPixels(maskLarge.getProcessor().getPixelsCopy(), index)
+		maskLarge.close()
 
 		#waitUser("check...")
 
-IJ.run(sumSmall,"Z Project...","start=1 stop="+str(N) +" projection=[Sum Slices]")
-sumSmallProj = IJ.getImage()
-IJ.saveAs(sumSmallProj,"jpg",maskDir + sumSmall.getTitle())
+if N>1:
+	IJ.run(sumSmall,"Z Project...","start=1 stop="+str(N) +" projection=[Sum Slices]")
+	sumSmallProj = IJ.getImage()
+	IJ.saveAs(sumSmallProj,"jpg",maskDir + sumSmall.getTitle())
+	sumSmallProj.close()
 
-IJ.run(sumLarge,"Z Project...","start=1 stop="+str(N) +" projection=[Sum Slices]")
-sumLargeProj = IJ.getImage()
-IJ.saveAs(sumLargeProj,"jpg",maskDir + sumLarge.getTitle())
+	IJ.run(sumLarge,"Z Project...","start=1 stop="+str(N) +" projection=[Sum Slices]")
+	sumLargeProj = IJ.getImage()
+	IJ.saveAs(sumLargeProj,"jpg",maskDir + sumLarge.getTitle())
+	sumLargeProj.close()
 
 sumSmall.close()
-sumSmallProj.close()
 sumLarge.close()
-sumLargeProj.close()
 
+roiLog.close()
 setupLog.close()
 
 # prepare batch file
@@ -268,14 +265,15 @@ print >> batch, ""
 print >> batch, "set rerun=0"
 print >> batch, ""
 print >> batch, "set results=${rundir}/results/results$VUORI_JOBINDEX-${rerun}.txt"
-print >> batch, "set mask=${rundir}/masks/mask_small_$VUORI_JOBINDEX.jpg"
+print >> batch, "set mask=${rundir}/masks/mask_large_$VUORI_JOBINDEX.jpg"
 print >> batch, "set data=${rundir}/../" + imp.getTitle()
 print >> batch, ""
 print >> batch, "module swap PrgEnv-pgi PrgEnv-gnu/4.7.1"
 print >> batch, "setenv LD_LIBRARY_PATH ${LD_LIBRARY_PATH}:/v/users/hajaalin/3B/build-gnu/lib"
 print >> batch, ""
 print >> batch, "/wrk/hajaalin/3B/multispot5_headless  --save_spots ${results} --log_ratios ${mask} ${data}"
-print >> batch, ""
+print >> batch, "awk '/PASS/{for(i=2; i<=NF; i+=4 ) print $(i+2), $(i+3), $i}' $results > $rundir/coordinates/coor_$results"
+print >> batch, "scripts/trim_to_smaller_rois.sh masks/mask_small_rois.txt coordinates/coor*$rerun.txt"
 batch.close()
 
 # prepare config file
@@ -359,6 +357,70 @@ print >> file, ""
 file.close()
 
 
+# prepare script for trimming coordinate files
+name = scriptDir + "trim_to_small_rois.py"
+file = open(name,'w')
+
+print >> file, "#!/usr/bin/env python"
+print >> file, "import os.path"
+print >> file, "import re"
+print >> file, "import sys"
+print >> file, ""
+print >> file, "# read roi file"
+print >> file, "filename = sys.argv[1]"
+print >> file, "file = open(filename, 'r')"
+print >> file, "lines = file.readlines()"
+print >> file, "file.close()"
+print >> file, ""
+print >> file, "rois = {}"
+print >> file, ""
+print >> file, "class Roi:"
+print >> file, "    def __init__(self,x,y,width,height):"
+print >> file, "        self.x = x"
+print >> file, "        self.y = y"
+print >> file, "        self.width = width"
+print >> file, "        self.height = height"
+print >> file, ""
+print >> file, "for l in lines:"
+print >> file, "    (index,x,y,width,height) = l.split(',')"
+print >> file, "    rois[index] = Roi(float(x),float(y),float(width),float(height))"
+print >> file, ""
+print >> file, "# regexp to find index in filename"
+print >> file, "r = re.compile('results([0-9]+)')"
+print >> file, ""
+print >> file, "# read result files"
+print >> file, "for filename in sys.argv[2:]:"
+print >> file, "    file = open(filename, 'r')"
+print >> file, "    lines = file.readlines()"
+print >> file, "    file.close()"
+print >> file, ""
+print >> file, "    print filename"
+print >> file, "    # find index"
+print >> file, "    result = re.search(r,filename)"
+print >> file, "    index = result.group(1)"
+print >> file, "    #print index"
+print >> file, ""
+print >> file, "    roi = rois[index]"
+print >> file, "    #print roi"
+print >> file, ""
+print >> file, "    (root,ext) = os.path.splitext(filename)"
+print >> file, "    outfilename = root + '_trimmed' + ext"
+print >> file, "    print outfilename"
+print >> file, "    outfile = open(outfilename, 'w')"
+print >> file, ""
+print >> file, "    for l in lines:"
+print >> file, "        (x,y,z) = l.split()"
+print >> file, "        x = float(x)"
+print >> file, "        y = float(y)"
+print >> file, "        z = float(z)"
+print >> file, ""
+print >> file, "        if roi.x < x and x < (roi.x+roi.width) and roi.y < y and y < (roi.y+roi.height):"
+print >> file, "            print >> outfile, x, y, z"
+print >> file, ""
+print >> file, "    outfile.close()"
+file.close()
+
+
 # prepare script for parsing coordinates
 name = scriptDir + "orgDataLocal.sh"
 file = open(name,'w')
@@ -367,7 +429,7 @@ print >> file, "#!/bin/bash"
 print >> file, "datapath=$(ls ./results)"
 print >> file, "for af in $datapath"
 print >> file, "do"
-print >> file, "        of='./coordinates/cor_'$af "
+print >> file, "        of='./coordinates/coor_'$af "
 print >> file, "        awk '/PASS/{for(i=2; i<=NF; i+=4 ) print $(i+2), $(i+3), $i}' './results/'$af > $of"
 print >> file, "done"
 file.close()
@@ -390,6 +452,29 @@ file = open(name, 'w')
 print >> file, "ssh " + host + " 'mkdir -p " + root + "'"
 print >> file, "rsync -acv " + imgDir + " " + host + rootSCP
 print >> file, "ssh " + host + " 'cd " + root + runDir + "; scripts/start_vuori.sh'"
+file.close()
+
+# prepare script for copying data to vuori
+name = scriptDir + "rsync_to_vuori.sh"
+file = open(name, 'w')
+print >> file, "rsync -acv " + imgDir + " " + host + rootSCP
+print >> file, "echo 'Next: ssh %s; cd %s; scripts/start_vuori.sh'" % (host, root + runDir)
+file.close()
+
+# prepare script for copying data from vuori
+name = scriptDir + "rsync_from_vuori.sh"
+file = open(name, 'w')
+print >> file, "rsync -acv " + host + rootSCP + " " + imgDir 
+print >> file, "scripts/orgDataLocal.sh"
+print >> file, "scripts/trim_to_small_rois.py masks/mask_small_rois.txt"
+print >> file, "scripts/output4plugin.sh"
+file.close()
+
+# prepare script for creating fake output file for visualising with the threeB plugin
+name = scriptDir + "output4plugin.sh"
+file = open(name, 'w')
+print >> file, 'echo "PIXELS %d %d %d %d">coordinates/output4plugin.txt ;' % (roi.x, roi.y, roi.x + roi.width, roi.y + roi.height)
+print >> file, "awk '{print \"PASS0: 1 1 \" $1, $2}' coordinates/*trimmed.txt>> coordinates/output4plugin.txt"
 file.close()
 
 os.system("chmod u+x " + scriptDir + "*")
