@@ -216,7 +216,7 @@ for i in range(0,nx):
 
 
 		# create dilated masks that will be used for processing
-		dilate = 4
+		dilate = 10
 		maskRoiLarge = Roi(startx-dilate, starty-dilate, dx+2*dilate, dy+2*dilate)
 		maskLarge = IJ.createImage("mask_large_" + str(index), "8-bit", dataWidth, dataHeight, 1)
 		maskLarge.getProcessor().multiply(0)
@@ -457,7 +457,7 @@ file.close()
 # prepare script for copying data to vuori
 name = scriptDir + "rsync_to_vuori.sh"
 file = open(name, 'w')
-print >> file, "rsync -acv " + imgDir + " " + host + rootSCP
+print >> file, "rsync -av " + imgDir + " " + host + rootSCP
 print >> file, "echo 'Next: ssh %s; cd %s; scripts/start_vuori.sh'" % (host, root + runDir)
 file.close()
 
@@ -466,7 +466,7 @@ name = scriptDir + "rsync_from_vuori.sh"
 file = open(name, 'w')
 print >> file, "rsync -acv " + host + rootSCP + " " + imgDir 
 print >> file, "scripts/orgDataLocal.sh"
-print >> file, "scripts/trim_to_small_rois.py masks/mask_small_rois.txt"
+print >> file, "scripts/trim_to_small_rois.py masks/mask_small_rois.txt coordinates/*"
 print >> file, "scripts/output4plugin.sh"
 file.close()
 
