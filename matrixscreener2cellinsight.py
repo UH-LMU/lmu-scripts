@@ -131,7 +131,8 @@ for w in wells:
             
             cellomicsName = plateCode  + '_'+ wellCode + 'f' + fieldCode+ 'd' + c +'.TIF'
             
-            cmd = ['imgcnv', '-project', '-i', slices_in,  '-o', cellomicsDir + "/" + cellomicsName]
-            logging.debug(cmd)
+            cmd = ['imgcnv', '-o', cellomicsDir + "/" + cellomicsName,' -project', '-i', slices_in]
+            logging.debug(" ".join(cmd))
             
-            subprocess.Popen(cmd)
+            #subprocess.Popen(cmd)
+            os.system(" ".join(cmd))
