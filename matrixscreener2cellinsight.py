@@ -1,8 +1,10 @@
+import fnmatch
 import glob
 import logging
 import os
 import os.path
 import re
+import shutil
 import string
 import subprocess
 import sys
@@ -22,7 +24,7 @@ reExp = re.compile('.*experiment--[0-9][0-9][0-9][0-9]_[0-9][0-9]_[0-9][0-9]_[0-
 
 result = reExp.search(filename)
 experimentDir = result.group(0)
-print experimentDir
+print "experimentDir:", experimentDir
 
 cellomicsDir = experimentDir + "_cellomics"
 if not os.path.isdir(cellomicsDir):
@@ -31,10 +33,6 @@ else:
     olds = glob.glob(cellomicsDir + "/*.*")
     for old in olds:
         os.remove(old)
-
-TAG_DATASET = 'dataset'
-TAG_WELL = 'well'
-TAG_FIELD = 'field'
 
 row_map = {'00':'A','01':'B', '02':'C', '03':'D', '04':'E', '05':'F', '06':'G', '07':'H' }
 
@@ -57,7 +55,7 @@ prog_c = re.compile('C([0-9]+).ome.tif')
 def createPlateCode(base):
     plate_code = re.sub('[^0-9]', '', base, 0)
     plate_code = re.sub('20', '', plate_code, 1)
-    plate_code = 'LEICA_' + plate_code
+    plate_code = 'LEICAHCSA-' + plate_code
     return plate_code
 
 def createWellCode(well):
@@ -84,6 +82,7 @@ def findFieldIndexRange(fields):
         ymax = max(y, ymax)
     # make indices start from 1, not 0
     return (xmax+1, ymax+1)
+    #return (xmax, ymax)
 
 def createFieldCode(xmax, ymax, field):
     result_f = prog_field.search(field)
@@ -91,7 +90,7 @@ def createFieldCode(xmax, ymax, field):
     y = result_f.group(2)
     x = int(x) + 1
     y = int(y) + 1
-    field_new = (y-1)*xmax + x
+    field_new = (y-1)*xmax + x -1
     field_new = repr(field_new).zfill(2)
     return field_new
 
@@ -99,40 +98,61 @@ result = prog_experiment.search(experimentDir)
 experiment = result.group(0)
 plateCode = createPlateCode(experiment)
 
+
+# recursively walk the directory and find all tifs,
+# store in plate{wells{fields{channels{slices}}}}
+plate = {}
+for root, dirnames, filenames in os.walk(experimentDir):
+  for filename in fnmatch.filter(filenames, '*.tif'):
+      result = reOME.search(filename)
+#      print filename
+      wellId = col_idx_well + result.group(3) + "--" + row_idx_well + result.group(4)
+      fieldId = col_idx_field + result.group(8) + "--" + row_idx_field + result.group(9)
+      channelId = result.group(12)
+
+      if not plate.has_key(wellId):
+          plate[wellId] = {}
+      well = plate[wellId]
+
+      if not well.has_key(fieldId):
+          well[fieldId] = {}
+      field = well[fieldId]
+
+      if not field.has_key(channelId):
+          field[channelId] = []
+      channel = field[channelId]
+
+      channel.append(root + "/" + filename)
+
+
+
 # loop over all wells
-wells = glob.glob(experimentDir + "/slide--S00/chamber--*")
-for w in wells:
+for w in plate.keys():
     wellCode = createWellCode(w)
     logging.debug( "Well " + w + " " + wellCode)
 
-# loop over all fields
-    fields = glob.glob(w + "/field--*")
+    # loop over all fields
+    fields = plate[w]
     (xmax, ymax) = findFieldIndexRange(fields)
-    
-    for f in fields:
+    for f in fields.keys():
         fieldCode = createFieldCode(xmax, ymax, f)
-        logging.debug("Field " + f)        
-
-        tifs = glob.glob(f + "/*.ome.tif")
-        
-        # find all channels
-        channels = set()
-        for t in tifs:
-            result = reOME.search(t)
-            if result:
-                c = result.group(12)
-                #logging.debug("found channel " + c)
-                channels.add(c)
+        logging.debug("Field " + f + " " + fieldCode)        
             
         # convert channels separately
-        for c in channels:
-            slices_in = glob.glob(f + "/*C" + c + ".ome.tif")
+        channels = fields[f]
+        for c in channels.keys():
             slices_in = f + '/*C' + c + '.ome.tif'
             
-            cellomicsName = plateCode  + '_'+ wellCode + 'f' + fieldCode+ 'd' + c +'.TIF'
+            cellomicsName = cellomicsDir + '/' + plateCode  + '_'+ wellCode + 'f' + fieldCode+ 'd' + str(int(c)) +'.TIF'
             
-            cmd = ['imgcnv', '-o', cellomicsDir + "/" + cellomicsName,' -project', '-i', slices_in]
-            logging.debug(" ".join(cmd))
-            
-            #subprocess.Popen(cmd)
-            os.system(" ".join(cmd))
+            # if data is a stack, make projection
+            slices = channels[c]
+            if len(slices) > 1:
+                cmd = ['imgcnv', '-o', cellomicsName,' -project', '-i', slices_in]
+                logging.debug(" ".join(cmd))
+                os.system(" ".join(cmd))
+            else:
+                logging.debug("cp " + slices[0] + " " + cellomicsName)
+                shutil.copyfile(slices[0], cellomicsName) 
+
+
