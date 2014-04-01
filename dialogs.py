@@ -27,8 +27,8 @@ class ConverterDialog(Tkinter.Frame):
         # define buttons
         Tkinter.Button(self, text='Select input directory', command=self.askinputdirectory).pack(**button_opt)
         Tkinter.Label(self, textvariable=self.vin).pack(**button_opt)
-        Tkinter.Label(self, text='File filter (e.g. *J07*)').pack(**button_opt)
-        Tkinter.Entry(self, textvariable=self.vmask).pack(**button_opt)
+        #Tkinter.Label(self, text='File filter (e.g. *J07*)').pack(**button_opt)
+        #Tkinter.Entry(self, textvariable=self.vmask).pack(**button_opt)
         Tkinter.Button(self, text='Select output root directory', command=self.askoutputdirectory).pack(**button_opt)
         Tkinter.Label(self, textvariable=self.voutroot).pack(**button_opt)
         Tkinter.Label(self, textvariable=self.vout).pack(**button_opt)
@@ -51,7 +51,7 @@ class ConverterDialog(Tkinter.Frame):
         if self.voutroot.get() == self.DEFAULT_OUTPUTROOT:
             self.voutroot.set(head)
 
-        self.voutleaf.set(tail+ "_stacks")
+        self.voutleaf.set(tail+ "_converted")
         self.vout.set(self.voutroot.get() + "/" + self.voutleaf.get())
 
     def askoutputdirectory(self):
@@ -98,6 +98,20 @@ class Matrix2StacksDialog(ConverterDialog):
         
         if self.converter != None:
             self.converter.convert(self.vin.get(),self.vout.get(),self.vwellcodes.get(),self.vfirstwell.get(),self.vmask.get())
+           
+class Cellomics2TiffDialog(ConverterDialog):
+    def __init__(self,root,converter=None):
+        ConverterDialog.__init__(self,root,converter)
+                        
+        Tkinter.Button(self, text="Start conversion", command=self.startconversion).pack()
+
+    def startconversion(self):
+        print "Cellomics2TiffDialog converting..."
+        print self.vin.get()
+        print self.vout.get()
+        
+        if self.converter != None:
+            self.converter.convert(self.vin.get(),self.vout.get())
            
 if __name__=='__main__':
     root = Tkinter.Tk()
