@@ -10,35 +10,37 @@ import logging
 IMAGEJ = "/nfs/hajaalin/Software/Fiji.app/ImageJ-linux64"
 EDF = "/nfs/hajaalin/Software/lmu-scripts/edf_process_headless.py"
 
-def edf(file_in,dir_out):
+# Create log file
+logging.basicConfig(filename='edf.log', format='%(levelname)s:%(message)s', level=logging.DEBUG)
+
+compute_output = "NOT_SET"
+
+def edf(file_in):
     head,tail = os.path.split(file_in)
-    file_out = dir_out + "/" + tail.replace(".tiff","_edf.tif")
+    file_out = compute_output + "/" + tail.replace(".tiff","_edf.tif")
 
     cmd = [IMAGEJ,EDF,"'"+file_in+"'","'"+file_out+"'",'> /dev/null']
-    print " ".join(cmd)
-    #subprocess.call(cmd, shell=False)
+    logging.info(" ".join(cmd))
     os.system(" ".join(cmd))
 
 
 parser = OptionParser()
-parser.add_option('-i','--staging_input', help='Staging input directory path or "AUTO"')
+parser.add_option('-s','--staging', help='Staging input directory path or "AUTO"')
 options,args = parser.parse_args()
 
 dir_input = args[0]
 dir_output_root = args[1]
 
 input_root,tail = os.path.split(dir_input)
-dir_output = os.path.join(dir_out_root,tail) + "_converted"
+dir_output = os.path.join(dir_output_root,tail) + "_converted"
 
 # start timer
 start_time = time.time()
 
-# Create log file
-logging.basicConfig(filename=dir_out+'/edf.log', format='%(levelname)s:%(message)s', level=logging.DEBUG)
 
 # check if output directory has data already
 if os.path.isdir(dir_output):
-    olds = glob.glob(dir_output + "/*.edf.tif")
+    olds = glob.glob(dir_output + "/*_edf.tif")
     if len(olds) > 0:
         print "Output directory and converted files exists, aborting."
         sys.exit(1)
@@ -64,7 +66,7 @@ if options.staging:
         logging.info(msg)
         cmd = "rsync -r '" + input_root + "/' " + staging
         logging.info(cmd)
-        #os.system(cmd)
+        os.system(cmd)
         logging.info("Time elapsed: " + str(time.time() - start_time) + "s")
 
         dir_in = staging
@@ -78,20 +80,20 @@ msg = "Converting..."
 print msg 
 logging.info(msg)
 pool = multiprocessing.Pool(None)
-files = glob.glob(dir_in + "/*.tiff")
-r = pool.map(edf, files, compute_output)
+files = glob.glob(dir_input + "/*.tiff")
+r = pool.map(edf, files)
 logging.info("Time elapsed: " + str(time.time() - start_time_convert) + "s")
 
 
 # Copy results outside the cluster
 if options.staging:
     start_time_copy = time.time()
-    msg = "Copying results to " + dir_out_root
+    msg = "Copying results to " + dir_output_root
     print msg
     logging.info(msg)
-    cmd = "rsync -r " + compute_output + " " + dir_out_root
+    cmd = "rsync -r " + compute_output + " " + dir_output_root
     logging.info(cmd)
-    #os.system(cmd)
+    os.system(cmd)
     logging.info("Time elapsed: " + str(time.time() - start_time_copy) + "s")
 
 logging.info("Total time elapsed: " + str(time.time() - start_time) + "s")
