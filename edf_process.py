@@ -13,6 +13,7 @@ file_out = sys.argv[2]
 # EDF parameters
 params = Parameters()
 params.setQualitySettings(params.QUALITY_HIGH)
+params.nScales = 10
 
 # read input image
 imp = ImagePlus(file_in)
