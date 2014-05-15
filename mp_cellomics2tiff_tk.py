@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import fnmatch
 import glob
+from itertools import repeat
 import logging
 import multiprocessing
 from optparse import OptionParser
@@ -11,6 +12,7 @@ import re
 import string
 import subprocess
 import sys
+import time
 import tempfile
 import shutil
 
@@ -19,24 +21,26 @@ from utils import *
 
 # use this on HCA workstation        
 
-class CellomicsConverter:
+def cellomics2tiff((file_in,dir_out)):
+    head,tail = os.path.split(file_in)
+    file_out = dir_out + "/" + tail.replace(".C01",".tif")
 
-    def cellomics2tiff(file_in):
-        head,tail = os.path.split(file_in)
-        file_out = dir_out + "/" + tail.replace(".C01",".tif")
+    #logging.debug(" ".join(cmd))
+    
+    #subprocess.call(cmd, shell=False)
+    #os.system(" ".join(cmd))
 
+    if platform.system() == 'Linux':
         cmd = ['bfconvert','-nogroup',file_in,file_out,'> /dev/null']
         print " ".join(cmd)
-        #logging.debug(" ".join(cmd))
-        
-        #subprocess.call(cmd, shell=False)
-        #os.system(" ".join(cmd))
+        subprocess.call(cmd,  shell=False)
+    else:
+        cmd = ['bfconvert','-nogroup',file_in,file_out]
+        print " ".join(cmd)
+        subprocess.call(cmd,  shell=True)
 
-        if platform.system() == 'Linux':
-            subprocess.call(cmd,  shell=False)
-        else:
-            subprocess.call(cmd,  shell=True)
 
+class CellomicsConverter:
 
     def convert(self,inputDir, outputDir):
 
@@ -62,8 +66,8 @@ class CellomicsConverter:
         print msg 
         #logging.info(msg)
         pool = multiprocessing.Pool(None)
-        files = glob.glob(dir_tmp + "/*.C01")
-        r = pool.map(cellomics2tiff, files)
+        files = glob.glob(inputDir + "/*.C01")
+        r = pool.map(cellomics2tiff, zip(files,repeat(outputDir)))
         #logging.info("Time elapsed: " + str(time.time() - start_time_convert) + "s")
         print "Time elapsed: " + str(time.time() - start_time_convert) + "s"
 
