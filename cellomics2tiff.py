@@ -71,11 +71,7 @@ if __name__=='__main__':
     parser = OptionParser(usage=usage)
     parser.add_option('-n', '--dryrun', action="store_true", default=False, help="Print actions but do not execute.")
     parser.add_option('-v', '--verbose', action="store_true", default=False, help="")
-    parser.add_option('-a', '--add_abc', action="store_true", default=False, help="")
-    parser.add_option('--add_well', action="store_true", default=False, help="")
-    parser.add_option('--first_well', default="A01", help="First well that was imaged.")
     parser.add_option('-d', '--output_root', help="Directory where the stacks will be stored.")
-    parser.add_option('-m', '--mask', default="*", help="Filename filter, e.g. *J07*.")
     options, args = parser.parse_args()
     
     converter = CellomicsConverter()
@@ -92,7 +88,7 @@ if __name__=='__main__':
             outputRoot = options.output_root  
         outputDir = os.path.join(outputRoot, tail + "_tifs")
             
-        converter.convert(inputDir, outputDir, options.add_well, options.first_well, options.mask)
+        converter.convert(inputDir, outputDir)
         
     # otherwise use Tk to get the info from user
     else:
