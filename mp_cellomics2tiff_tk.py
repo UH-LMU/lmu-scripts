@@ -67,6 +67,8 @@ class CellomicsConverter:
         #logging.info(msg)
         pool = multiprocessing.Pool(None)
         files = glob.glob(inputDir + "/*.C01")
+
+        # http://stackoverflow.com/questions/8521883/multiprocessing-pool-map-and-function-with-two-arguments
         r = pool.map(cellomics2tiff, zip(files,repeat(outputDir)))
         #logging.info("Time elapsed: " + str(time.time() - start_time_convert) + "s")
         print "Time elapsed: " + str(time.time() - start_time_convert) + "s"
