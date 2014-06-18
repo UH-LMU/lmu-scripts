@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 import fnmatch
 import glob
+from itertools import repeat
 import logging
+import multiprocessing
 from optparse import OptionParser
 import os
 import os.path
@@ -10,14 +12,33 @@ import re
 import string
 import subprocess
 import sys
+import time
 import tempfile
-import Tkinter, Tkconstants, tkFileDialog
 import shutil
 
 from dialogs import *
 from utils import *
 
-        
+# use this on HCA workstation        
+
+def cellomics2tiff((file_in,dir_out)):
+    head,tail = os.path.split(file_in)
+    file_out = dir_out + "/" + tail.replace(".C01",".tif")
+
+    #logging.debug(" ".join(cmd))
+    
+    #subprocess.call(cmd, shell=False)
+    #os.system(" ".join(cmd))
+
+    if platform.system() == 'Linux':
+        cmd = ['bfconvert','-nogroup',file_in,file_out,'> /dev/null']
+        print " ".join(cmd)
+        subprocess.call(cmd,  shell=False)
+    else:
+        cmd = ['bfconvert','-nogroup',file_in,file_out]
+        print " ".join(cmd)
+        subprocess.call(cmd,  shell=True)
+
 
 class CellomicsConverter:
 
@@ -30,7 +51,7 @@ class CellomicsConverter:
             for old in olds:
                 os.remove(old)
 
-        logging.basicConfig(filename=outputDir+'/cellomics2tiff.log', format='%(levelname)s:%(message)s', level=logging.DEBUG)
+        #logging.basicConfig(filename=outputDir+'/cellomics2tiff.log', format='%(levelname)s:%(message)s', level=logging.DEBUG)
         #logging.basicConfig(level=logging.DEBUG)
 
         # recursively walk the directory and find all different field codes
@@ -39,25 +60,21 @@ class CellomicsConverter:
         # temporary directory for conversions
         #tmpdir = tempfile.mkdtemp()
 
-        # loop over all wells
-        for f in c01s:
-            # define output file name
-            head,tail = os.path.split(f)
-            outputFile =  outputDir + "/" + tail.replace("C01","tif")
+        # Convert the data
+        start_time_convert = time.time()
+        msg = "Converting..."
+        print msg 
+        #logging.info(msg)
+        pool = multiprocessing.Pool(None)
+        files = glob.glob(inputDir + "/*.C01")
 
-            # command to combine images of a field
-            cmd_field = ['bfconvert','-nogroup',f,outputFile]                    
-            logging.debug(" ".join(cmd_field))
-            
-            if platform.system() == 'Linux':
-                subprocess.call(cmd_field,  shell=False)
-            else:
-                subprocess.call(cmd_field,  shell=True)
+        # http://stackoverflow.com/questions/8521883/multiprocessing-pool-map-and-function-with-two-arguments
+        r = pool.map(cellomics2tiff, zip(files,repeat(outputDir)))
+        #logging.info("Time elapsed: " + str(time.time() - start_time_convert) + "s")
+        print "Time elapsed: " + str(time.time() - start_time_convert) + "s"
 
         # remove temporary files
         #shutil.rmtree(tmpdir)
-        
-
 
 
 if __name__=='__main__':
@@ -92,9 +109,9 @@ if __name__=='__main__':
         
     # otherwise use Tk to get the info from user
     else:
+        import Tkinter, Tkconstants, tkFileDialog
         root = Tkinter.Tk()
         Cellomics2TiffDialog(root,converter).pack()
         root.mainloop()
-
 
 
