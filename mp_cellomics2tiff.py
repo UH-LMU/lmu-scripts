@@ -33,9 +33,14 @@ def cellomics2tiff((file_in,dir_out)):
 
     if platform.system() == 'Linux':
         #cmd = ['bfconvert','-nogroup',file_in,file_out,'> /dev/null']
-        cmd = ['bfconvert','-nogroup',file_in,file_out]
-        print " ".join(cmd)
-        subprocess.call(cmd,  shell=False)
+        #cmd = ['/opt/bftools/bfconvert','-nogroup',file_in,file_out,']
+        #print " ".join(cmd)
+        #FNULL = open(os.devnull,'w')
+        #subprocess.call(cmd,  stdout=FNULL, shell=False)
+        #FNULL.close()
+        cmd = '/opt/bftools/bfconvert -nogroup %s %s > /dev/null'%(file_in,file_out)
+        #print cmd
+        os.system(cmd)
     else:
         cmd = ['bfconvert','-nogroup',file_in,file_out]
         print " ".join(cmd)
