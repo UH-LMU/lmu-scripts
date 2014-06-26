@@ -14,7 +14,7 @@ def mdb_export(database,dir_out):
     tables = table_names.splitlines()
 
     print "BEGIN;" # start a transaction, speeds things up when importing
-    sys.stdout.flush()
+    #sys.stdout.flush()
 
     # Dump each table as a CSV file using "mdb-export",
     # converting " " in table names to "_" for the CSV filenames.
