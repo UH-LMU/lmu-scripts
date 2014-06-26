@@ -1,26 +1,14 @@
 #!/usr/bin/env python
-import fnmatch
 import glob
-from itertools import repeat
-import logging
-import multiprocessing
 from optparse import OptionParser
 import os
 import os.path
-import platform
 import re
 import shutil
-import string
-import subprocess
 import sys
-import time
-import tempfile
 import shutil
 import Tkinter, Tkconstants, tkFileDialog
 from Tkinter import *
-
-from mdb_export import mdb_export
-from utils import *
 
 class Wells2FoldersDialog(Tkinter.Frame):
 
@@ -50,7 +38,6 @@ class Wells2FoldersDialog(Tkinter.Frame):
         Tkinter.Button(self, text="Sort by wells", command=self.startconversion).pack()
 
     def askinputdirectory(self):
-
         """Returns a selected directoryname."""
 
         dirname = tkFileDialog.askdirectory(**self.dir_opt)
@@ -58,7 +45,7 @@ class Wells2FoldersDialog(Tkinter.Frame):
         self.vin.set(dirname)
 
     def startconversion(self):
-        print "Matrix2StacksDialog converting..."
+        print "Wells2FoldersDialog converting..."
         print self.vin.get()
         
         if self.converter != None:
@@ -83,11 +70,7 @@ class Wells2Folders:
             print "WELLDIR:",wellDir
             if not os.path.isdir(wellDir):
                 os.makedirs(wellDir)
-            #old = os.path.join(inputDir,tif)
-            #new = os.path.join(wellDir,tif)
-            new = wellDir + "/" + tif
-            #print "OLD:",old
-            #print "NEW:",new
+
             shutil.move(tif, wellDir)
 
             
