@@ -4,7 +4,6 @@ import math, sys, time
 import subprocess
 import glob
 import os
-import logging
 
 from mp_cellomics2tiff import CellomicsConverter
     
@@ -16,7 +15,8 @@ staging_root = os.path.expanduser("~") + "/staging/"
 
 # output root directory on lmu-active
 dir_out_root = "/mnt/FROM_CSC_LMU/CellInsight"
-dir_out_root = "/mnt/lmu-active-rw/LMU-active2/users/FROM_CSC_LMU/CellInsight"
+dir_out_root = "/home/hajaalin/tmp"
+#dir_out_root = "/mnt/lmu-active-rw/LMU-active2/users/FROM_CSC_LMU/CellInsight"
 
 
 # process all CellInsight datasets in the input directory
@@ -51,36 +51,35 @@ for dir_in in datasets:
     # Create log file
     t = time.time()
     ft = datetime.datetime.fromtimestamp(t).strftime('%Y%m%d-%H%M%S')
-    logging.basicConfig(filename=dir_out_root+'/stage_cellomics2tiff_%s_%s.log'%(tail,ft),\
-                        format='%(levelname)s:%(message)s', level=logging.DEBUG)
-
+    logfile = open(dir_out_root+'/%s_stage_cellomics2tiff_%s.log'%(tail,ft),'w')
     start_time = time.time()
 
     # Copy data to the cluster
     msg ="Copying (rsync) data to " + staging_in + "..."
     print msg
-    logging.info(msg)
+    print >> logfile, msg
     os.system("rsync -r " + dir_in + "/ " + staging_in)
-    logging.info("Time elapsed: " + str(time.time() - start_time) + "s")
+    print >> logfile, "Time elapsed: " + str(time.time() - start_time) + "s"
 
     # Convert the data
     start_time_convert = time.time()
     msg = "Converting..."
     print msg 
-    logging.info(msg)
+    print >> logfile, msg
     converter = CellomicsConverter()
     converter.convert(staging_in,staging_out)
-    logging.info("Time elapsed: " + str(time.time() - start_time_convert) + "s")
+    print >> logfile, "Time elapsed: " + str(time.time() - start_time_convert) + "s"
 
     # Copy results outside the cluster
     start_time_copy = time.time()
     msg = "Copying results to " + dir_out_root
     print msg
-    logging.info(msg)
+    print >> logfile, msg
     os.system("rsync -r " + staging_out + " " + dir_out_root)
-    logging.info("Time elapsed: " + str(time.time() - start_time_copy) + "s")
+    print >> logfile, "Time elapsed: " + str(time.time() - start_time_copy) + "s"
 
-    logging.info("Total time elapsed: " + str(time.time() - start_time) + "s")
+    print >> logfile, "Total time elapsed: " + str(time.time() - start_time) + "s"
+    logfile.close()
 
 ##    # Flag the input directory as converted
 ##    flag = open(flag_converted, 'w')
