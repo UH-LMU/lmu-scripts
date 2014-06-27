@@ -1,6 +1,7 @@
 #!/usr/bin/python
 import datetime
 import math, sys, time
+import string
 import subprocess
 import glob
 import os
@@ -38,9 +39,13 @@ for dir_in in datasets:
 ##    if os.path.isfile(flag_converted):
 
     # skip if results directory exists
-    if os.path.isdir(os.path.join(dir_out_root,tail + "_converted")):
-        print dir_in, "seems to be converted, skipping..."
-        continue
+    converted = glob.glob(dir_out_root + "/*/*")
+    print converted
+    for dataset in converted:
+        if string.find(dataset,tail + "_converted") != -1:
+        #if os.path.isdir(os.path.join(dir_out_root,tail + "_converted")):
+            print "stage_cellomics2tiff:", dir_in, "seems to be converted, skipping..."
+            continue
     
     # Create staging directories
     if not os.path.isdir(staging_in):
@@ -72,19 +77,19 @@ for dir_in in datasets:
 
     # find the creator of the data from metadata
     csv = os.path.join(staging_out,"metadata","asnPlate.csv")
-    utils = CellomicsUtils
+    utils = CellomicsUtils()
     creator = utils.findCreator(csv)
     
     # Copy results outside the cluster
-    dir_out_root = os.path.join(dir_out_root,creator)
-    if not os.path.isdir(dir_out_root):
-        os.mkdirs(dir_out_root)
+    dir_out = os.path.join(dir_out_root,creator)
+    if not os.path.isdir(dir_out):
+        os.makedirs(dir_out)
         
     start_time_copy = time.time()
-    msg = "Copying results to " + dir_out_root
+    msg = "Copying results to " + dir_out
     print msg
     print >> logfile, msg
-    os.system("rsync -r " + staging_out + " " + dir_out_root)
+    os.system("rsync -r " + staging_out + " " + dir_out)
     print >> logfile, "Time elapsed: " + str(time.time() - start_time_copy) + "s"
 
     print >> logfile, "Total time elapsed: " + str(time.time() - start_time) + "s"
