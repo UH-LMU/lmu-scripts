@@ -52,8 +52,8 @@ class CellomicsConverter:
     
     def convert(self,inputDir, outputDir):
         """Converts a folder of C01 files."""
-        print "INPUT: " + inputDir
-        print "OUTPUT: " + outputDir
+        print "mp_cellomics2tiff:","INPUT:", inputDir
+        print "mp_cellomics2tiff:","OUTPUT:", outputDir
 
         # check if dataset is already converted
         if os.path.isdir(outputDir):
@@ -62,7 +62,7 @@ class CellomicsConverter:
                 logfile = open(os.path.join(outputDir,'cellomics2tiff_error.log'),'w')
                 msg = "Seems that data was converted already, stopping."
                 print >> logfile, msg
-                print msg
+                print "mp_cellomics2tiff:",msg
                 logfile.close()
                 return
         else:
@@ -84,7 +84,7 @@ class CellomicsConverter:
         # Convert the data
         start_time_convert = time.time()
         msg = "Converting..."
-        print msg 
+        print "mp_cellomics2tiff:",msg 
         logging.info(msg)
         pool = multiprocessing.Pool(None)
         files = glob.glob(inputDir + "/*.C01")
@@ -92,7 +92,7 @@ class CellomicsConverter:
         # http://stackoverflow.com/questions/8521883/multiprocessing-pool-map-and-function-with-two-arguments
         r = pool.map(cellomics2tiff, zip(files,repeat(outputDir)))
         msg = "Time elapsed: " + str(time.time() - start_time_convert) + "s"
-        print msg
+        print "mp_cellomics2tiff:",msg
         logging.info(msg)
 
 
