@@ -1,5 +1,16 @@
 import re
 
+class CellomicsUtils:
+    def findCreator(self,asnPlate):
+        csv = open(asnPlate,'r')
+        keys = csv.readline().split(',')
+        values = csv.readline().split(',')
+        csv.close()
+        for i in range(1,len(keys)+1):
+            if keys[i] == "Creator":
+                return values[i].replace('"','')
+
+
 class MatrixUtils:
     rows = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z']
     refirstwell = re.compile('([A-Z])([0-9]+)')
@@ -68,4 +79,5 @@ if __name__=='__main__':
     print m.wellcode('image--L0000--S00--U00--V00--J07--E02--O01--X01--Y00--T0000--Z05--C00.ome.tif','B02')
     print m.fieldcode('image--L0000--S00--U07--V00--J07--E02--O01--X01--Y00--T0000--Z05--C00.ome.tif')
 
-
+    c = CellomicsUtils()
+    print c.findCreator('/mnt/lmu-active/LMU-active2/users/FROM_CSC_LMU/CellInsight/LMU-CELLINSIGHT_140625100001_converted/metadata/asnPlate.csv')

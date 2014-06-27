@@ -6,6 +6,7 @@ import glob
 import os
 
 from mp_cellomics2tiff import CellomicsConverter
+from utils import CellomicsUtils
     
 # input directory on lmu-active
 dir_in_root = "/mnt/lmu-active/LMU-active2/users/FROM_CELLINSIGHT"
@@ -17,7 +18,6 @@ staging_root = os.path.expanduser("~") + "/staging/"
 dir_out_root = "/mnt/FROM_CSC_LMU/CellInsight"
 dir_out_root = "/home/hajaalin/tmp"
 #dir_out_root = "/mnt/lmu-active-rw/LMU-active2/users/FROM_CSC_LMU/CellInsight"
-
 
 # process all CellInsight datasets in the input directory
 datasets = os.listdir(dir_in_root)
@@ -70,7 +70,16 @@ for dir_in in datasets:
     converter.convert(staging_in,staging_out)
     print >> logfile, "Time elapsed: " + str(time.time() - start_time_convert) + "s"
 
+    # find the creator of the data from metadata
+    csv = os.path.join(staging_out,"metadata","asnPlate.csv")
+    utils = CellomicsUtils
+    creator = utils.findCreator(csv)
+    
     # Copy results outside the cluster
+    dir_out_root = os.path.join(dir_out_root,creator)
+    if not os.path.isdir(dir_out_root):
+        os.mkdirs(dir_out_root)
+        
     start_time_copy = time.time()
     msg = "Copying results to " + dir_out_root
     print msg
