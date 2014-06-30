@@ -8,12 +8,15 @@ import os
 
 from mp_cellomics2tiff import CellomicsConverter
 from utils import CellomicsUtils
-    
+
 # input directory on lmu-active
 INPUT_ROOT = "/mnt/lmu-active/LMU-active2/users/FROM_CELLINSIGHT"
 
 # staging directory on compute server
 STAGING_ROOT = os.path.expanduser("~") + "/staging/"
+
+# lock file
+PIDFILE = os.path.join(STAGING_ROOT, "stage_cellomics2tiff.pid")
 
 # output root directory on lmu-active
 OUTPUT_ROOT = "/mnt/FROM_CSC_LMU/CellInsight"
@@ -23,6 +26,9 @@ OUTPUT_ROOT = "/home/hajaalin/tmp"
 
 def stageAndConvert(dir_in):
     dir_in = os.path.join(INPUT_ROOT,dir_in)
+
+    # input image files
+    c01s = glob.glob(dir_in + "/*.C01")
 
     # skip items that are not directories
     if not os.path.isdir(dir_in):
@@ -40,11 +46,13 @@ def stageAndConvert(dir_in):
     #print converted
     for dataset in converted:
         if string.find(dataset,tail + "_converted") != -1:
-            print "stage_cellomics2tiff:","CONVERTED",dataset
-            print "stage_cellomics2tiff:","CURRENT", tail + "_converted"
-            print "stage_cellomics2tiff:",dir_in,"seems to be converted, skipping..."
-            print
-            return
+            tifs = glob.glob(dataset + "/*.tif")
+            if len(tifs) == len(c01s):
+                print "stage_cellomics2tiff:","CONVERTED",dataset
+                print "stage_cellomics2tiff:","CURRENT", tail + "_converted"
+                print "stage_cellomics2tiff:",dir_in,"seems to be converted, skipping..."
+                print
+                return
     
     # Create staging directories
     if not os.path.isdir(staging_in):
@@ -94,16 +102,24 @@ def stageAndConvert(dir_in):
     print >> logfile, "Total time elapsed: " + str(time.time() - start_time) + "s"
     logfile.close()
 
+# check if conversion is already running
+if os.path.isfile(PIDFILE):
+    print "Conversion is already running, exiting..."
+    sys.exit(0)
+
+# write process id to lock file
+pidfile = open(PIDFILE,'w')
+pid = os.getpid()
+print >> pidfile, str(pid)
+pidfile.close()
 
 # process all CellInsight datasets in the input directory
 datasets = os.listdir(INPUT_ROOT)
 for dir_in in datasets:
     stageAndConvert(dir_in)
 
-##    # Flag the input directory as converted
-##    flag = open(flag_converted, 'w')
-##    print >> flag,"CONVERTED"
-##    flag.close()
-    
+# remove lock file
+os.remove(PIDFILE)
+
 print "stage_cellomics2tiff:","Done."
 

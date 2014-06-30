@@ -26,6 +26,10 @@ def cellomics2tiff((file_in,dir_out)):
     head,tail = os.path.split(file_in)
     file_out = dir_out + "/" + tail.replace(".C01",".tif")
 
+    # don't repeat conversion
+    if os.isfile(file_out):
+        return
+
     #logging.debug(" ".join(cmd))
     
     #subprocess.call(cmd, shell=False)
@@ -55,10 +59,13 @@ class CellomicsConverter:
         print "mp_cellomics2tiff:","INPUT:", inputDir
         print "mp_cellomics2tiff:","OUTPUT:", outputDir
 
-        # check if dataset is already converted
+        # input image files
+        c01s = glob.glob(inputDir + "/*.C01")
+
         if os.path.isdir(outputDir):
+            # check if entire dataset is already converted
             tifs = glob.glob(outputDir + "/*.tif")
-            if len(tifs) > 0:
+            if len(tifs) == len(c01s):
                 logfile = open(os.path.join(outputDir,'cellomics2tiff_error.log'),'w')
                 msg = "Seems that data was converted already, stopping."
                 print >> logfile, msg
@@ -68,18 +75,17 @@ class CellomicsConverter:
         else:
             os.makedirs(outputDir)
 
-        os.makedirs(os.path.join(outputDir,"metadata"))
-        logging.basicConfig(filename=outputDir+'/cellomics2tiff.log', format='%(levelname)s:%(message)s', level=logging.DEBUG)
-        logging.basicConfig(level=logging.DEBUG)
+        metadataDir = os.path.join(outputDir,"metadata")
+        if not os.path.isdir(metadataDir):
+            os.makedirs(metadataDir)
+            logging.basicConfig(filename=outputDir+'/cellomics2tiff.log', format='%(levelname)s:%(message)s', level=logging.DEBUG)
+            logging.basicConfig(level=logging.DEBUG)
 
-        # convert the metadata in MS Access files to CSV             
-        mdbs = glob.glob(inputDir + "/*.MDB")
-        for mdb in mdbs:
-            mdb_export(mdb, os.path.join(outputDir,"metadata"))
+            # convert the metadata in MS Access files to CSV             
+            mdbs = glob.glob(inputDir + "/*.MDB")
+            for mdb in mdbs:
+                mdb_export(mdb, metadataDir)
 
-
-        # recursively walk the directory and find all different field codes
-        c01s = glob.glob(inputDir + "/*.C01")
 
         # Convert the data
         start_time_convert = time.time()
