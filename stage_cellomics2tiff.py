@@ -14,6 +14,7 @@ creator = "creator"
 
 # input directory on lmu-active
 INPUT_ROOT = "/mnt/lmu-active/LMU-active2/users/FROM_CELLINSIGHT"
+#INPUT_ROOT = "/tmp"
 
 # staging directory on compute server
 STAGING_ROOT = os.path.expanduser("~") + "/staging/"
@@ -24,7 +25,7 @@ PIDFILE = os.path.join(STAGING_ROOT, "stage_cellomics2tiff.pid")
 # output root directory on lmu-active
 OUTPUT_ROOT = "/mnt/FROM_CSC_LMU/CellInsight"
 #OUTPUT_ROOT = "/home/hajaalin/tmp"
-#OUTPUT_ROOT = "/mnt/lmu-active-rw/LMU-active2/users/FROM_CSC_LMU/CellInsight"
+#OUTPUT_ROOT = "/mnt/lmu-active/LMU-active2/users/FROM_CSC_LMU/CellInsight"
 
 cutils = CellomicsUtils()
 
@@ -38,6 +39,11 @@ def stageAndConvert(dir_in):
     if not os.path.isdir(dir_in):
         return
 
+    # skip of not a Cellomics dataset
+    if not cutils.isCellomicsDataset(dir_in):
+        print "stage_cellomics2tiff: not a C01 dataset:",dir_in
+        return
+    
     print "stage_cellomics2tiff INPUT:",dir_in
 
     # input and output directories on csc-lmu-ubuntu

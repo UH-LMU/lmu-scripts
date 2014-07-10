@@ -18,6 +18,10 @@ class CellomicsUtils:
         #print "C01:",C01
         #print "TIF:",tif
         return tif
+
+    def isCellomicsDataset(self,inputDir):
+        C01s = glob.glob(inputDir + "/*.C01")
+        return len(C01s) != 0
         
     def isDatasetConverted(self,inputDir,outputDir):
         C01s = glob.glob(inputDir + "/*.C01")
