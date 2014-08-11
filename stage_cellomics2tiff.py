@@ -134,10 +134,20 @@ print >> pidfile, str(pid)
 pidfile.close()
 
 # process all CellInsight datasets in the input directory
-datasets = os.listdir(INPUT_ROOT)
+datasets = []
+try:
+    datasets = os.listdir(INPUT_ROOT)
+except Exception as e:
+    print "Failed to read input directory."
+    print e.strerror
+    
 for dir_in in datasets:
-    stageAndConvert(dir_in)
-
+    try:
+        stageAndConvert(dir_in)
+    except Exception as e:
+        print "Failed to convert " + dir_in
+        print e.strerror
+        
 # remove lock file
 os.remove(PIDFILE)
 
