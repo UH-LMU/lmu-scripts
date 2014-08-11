@@ -12,7 +12,6 @@ from mp_cellomics2tiff import CellomicsConverter
 from utils import CellomicsUtils
 
 DRY_RUN = False
-CREATOR = "creator"
 
 # input directory
 INPUT_ROOT = None
@@ -90,6 +89,7 @@ def stageAndConvert(dir_in):
     msg = "Converting..."
     print "stage_cellomics2tiff:",msg 
     print >> logfile, msg
+    creator = "creator"
     if not DRY_RUN:
         converter = CellomicsConverter()
         converter.convert(staging_in,staging_out)
@@ -97,10 +97,10 @@ def stageAndConvert(dir_in):
 
         # find the creator of the data from metadata
         csv = os.path.join(staging_out,"metadata","asnPlate.csv")
-        CREATOR = cutils.findCreator(csv)
+        creator = cutils.findCreator(csv)
         
     # Copy results outside the cluster
-    dir_out = os.path.join(OUTPUT_ROOT,CREATOR)
+    dir_out = os.path.join(OUTPUT_ROOT,creator)
     if not os.path.isdir(dir_out):
         os.makedirs(dir_out)
         
