@@ -70,6 +70,7 @@ def stageAndConvert(dir_in):
         os.makedirs(staging_out)
 
     # Create log file
+    os.makedirs(os.path.join(OUTPUT_ROOT,'log'))
     t = time.time()
     ft = datetime.datetime.fromtimestamp(t).strftime('%Y%m%d-%H%M%S')
     logfile = open(OUTPUT_ROOT+'/log/%s_stage_cellomics2tiff_%s.log'%(tail,ft),'w')
