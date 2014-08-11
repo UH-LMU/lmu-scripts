@@ -43,7 +43,7 @@ def stageAndConvert(dir_in):
 
     # input and output directories on csc-lmu-ubuntu
     head,tail = os.path.split(dir_in)
-    staging_in = STAGING_ROOT + tail
+    staging_in = os.path.join(STAGING_ROOT,tail)
     staging_out = staging_in + "_converted"
 
     # list of converted datasets, in subfolders by user
@@ -80,8 +80,11 @@ def stageAndConvert(dir_in):
     msg ="Copying (rsync) data to " + staging_in + "..."
     print "stage_cellomics2tiff:",msg
     print >> logfile, msg
+    cmd = "rsync -rt " + dir_in + "/ " + staging_in
+    print cmd
+    print >> logfile, cmd
     if not DRY_RUN:
-        os.system("rsync -rt " + dir_in + "/ " + staging_in)
+        os.system(cmd)
     print >> logfile, "Time elapsed: " + str(time.time() - start_time) + "s"
 
     # Convert the data
@@ -108,8 +111,11 @@ def stageAndConvert(dir_in):
     msg = "Copying " + staging_out + " to " + dir_out
     print "stage_cellomics2tiff:",msg
     print >> logfile, msg
+    cmd = "rsync -r " + staging_out + " " + dir_out
+    print cmd
+    print >> logfile, cmd
     if not DRY_RUN:
-        os.system("rsync -r " + staging_out + " " + dir_out)
+        os.system(cmd)
     print >> logfile, "Time elapsed: " + str(time.time() - start_time_copy) + "s"
 
     print >> logfile, "Total time elapsed: " + str(time.time() - start_time) + "s"
