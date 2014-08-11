@@ -99,17 +99,18 @@ def stageAndConvert(dir_in):
         csv = os.path.join(staging_out,"metadata","asnPlate.csv")
         creator = cutils.findCreator(csv)
         
-        # Copy results outside the cluster
-        dir_out = os.path.join(OUTPUT_ROOT,creator)
-        if not os.path.isdir(dir_out):
-            os.makedirs(dir_out)
-            
-        start_time_copy = time.time()
-        msg = "Copying " + staging_out + " to " + dir_out
-        print "stage_cellomics2tiff:",msg
-        print >> logfile, msg
+    # Copy results outside the cluster
+    dir_out = os.path.join(OUTPUT_ROOT,creator)
+    if not os.path.isdir(dir_out):
+        os.makedirs(dir_out)
+        
+    start_time_copy = time.time()
+    msg = "Copying " + staging_out + " to " + dir_out
+    print "stage_cellomics2tiff:",msg
+    print >> logfile, msg
+    if not DRY_RUN:
         os.system("rsync -r " + staging_out + " " + dir_out)
-        print >> logfile, "Time elapsed: " + str(time.time() - start_time_copy) + "s"
+    print >> logfile, "Time elapsed: " + str(time.time() - start_time_copy) + "s"
 
     print >> logfile, "Total time elapsed: " + str(time.time() - start_time) + "s"
     logfile.close()
