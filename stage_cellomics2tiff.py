@@ -4,6 +4,7 @@ import math, sys, time
 import string
 import subprocess
 import glob
+from optparse import OptionParser
 import os
 
 from mp_cellomics2tiff import CellomicsConverter
@@ -12,20 +13,14 @@ from utils import CellomicsUtils
 DRY_RUN = False
 creator = "creator"
 
-# input directory on lmu-active
-INPUT_ROOT = "/mnt/lmu-active/LMU-active2/users/FROM_CELLINSIGHT"
-#INPUT_ROOT = "/tmp"
+# input directory
+INPUT_ROOT = None
 
 # staging directory on compute server
-STAGING_ROOT = os.path.expanduser("~") + "/staging/"
-
-# lock file
-PIDFILE = os.path.join(STAGING_ROOT, "stage_cellomics2tiff.pid")
+STAGING_ROOT = None
 
 # output root directory on lmu-active
-OUTPUT_ROOT = "/mnt/FROM_CSC_LMU/CellInsight"
-#OUTPUT_ROOT = "/home/hajaalin/tmp"
-#OUTPUT_ROOT = "/mnt/lmu-active/LMU-active2/users/FROM_CSC_LMU/CellInsight"
+OUTPUT_ROOT = None
 
 cutils = CellomicsUtils()
 
@@ -118,38 +113,64 @@ def stageAndConvert(dir_in):
     print
 
 
-if len(sys.argv) > 1:
-    print "DRY RUN"
-    DRY_RUN = True
-    
-# check if conversion is already running
-if os.path.isfile(PIDFILE):
-    print "Conversion is already running, exiting..."
-    sys.exit(0)
+##
+## Main part
+##
+if __name__=='__main__':
 
-# write process id to lock file
-pidfile = open(PIDFILE,'w')
-pid = os.getpid()
-print >> pidfile, str(pid)
-pidfile.close()
+    usage = """%prog [options] input_dir staging_dir output_dir
 
-# process all CellInsight datasets in the input directory
-datasets = []
-try:
-    datasets = os.listdir(INPUT_ROOT)
-except Exception as e:
-    print "Failed to read input directory."
-    print e.strerror
+                Stage and convert CellInsight data to TIF.
+                RUN '%prog -h for options.'"""
+
+    parser = OptionParser(usage=usage)
+    parser.add_option('-n', '--dryrun', action="store_true", \
+                      default=False, help="Print actions but do not execute.")
+    parser.add_option('-i', '--input', default='/input', help="Input directory [default: %default].")
+    parser.add_option('-s', '--staging', default='/staging', help="Staging directory [default: %default].")
+    parser.add_option('-o', '--output', default='/output', help="Output directory [default: %default].")
     
-for dir_in in datasets:
+    opts,args = parser.parse_args()
+    if opts.dryrun:
+        print "DRY RUN"
+        DRY_RUN = True
+
+    INPUT_ROOT = opts.input
+    STAGING_ROOT = opts.staging
+    OUTPUT_ROOT = opts.output
+
+    # lock file
+    pidfile_name = os.path.join(STAGING_ROOT, "stage_cellomics2tiff.pid")
+
+    # check if conversion is already running
+    if os.path.isfile(pidfile_name):
+        print "Conversion is already running, exiting..."
+        sys.exit(0)
+
+    # write process id to lock file
+    pidfile = open(pidfile_name,'w')
+    pid = os.getpid()
+    print >> pidfile, str(pid)
+    pidfile.close()
+
+
+    # process all CellInsight datasets in the input directory
+    datasets = []
     try:
-        stageAndConvert(dir_in)
+        datasets = os.listdir(INPUT_ROOT)
     except Exception as e:
-        print "Failed to convert " + dir_in
+        print "Failed to read input directory."
         print e.strerror
         
-# remove lock file
-os.remove(PIDFILE)
+    for dir_in in datasets:
+        try:
+            stageAndConvert(dir_in)
+        except Exception as e:
+            print "Failed to convert " + dir_in
+            print e.strerror
+            
+    # remove lock file
+    os.remove(PIDFILE)
 
-print "stage_cellomics2tiff:","Done."
+    print "stage_cellomics2tiff:","Done."
 
