@@ -16,7 +16,6 @@ import time
 import tempfile
 import shutil
 
-from dialogs import *
 from mdb_export import mdb_export
 from utils import *
 
@@ -136,6 +135,8 @@ if __name__=='__main__':
     # otherwise use Tk to get the info from user
     else:
         import Tkinter, Tkconstants, tkFileDialog
+        from dialogs import Cellomics2TiffDialog
+
         root = Tkinter.Tk()
         Cellomics2TiffDialog(root,converter).pack()
         root.mainloop()
