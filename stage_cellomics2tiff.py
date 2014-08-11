@@ -6,6 +6,7 @@ import subprocess
 import glob
 from optparse import OptionParser
 import os
+import traceback
 
 from mp_cellomics2tiff import CellomicsConverter
 from utils import CellomicsUtils
@@ -167,7 +168,8 @@ if __name__=='__main__':
             stageAndConvert(dir_in)
         except Exception as e:
             print "Failed to convert " + dir_in
-            print e.strerror
+            #print e.strerror
+            traceback.print_exc()
             
     # remove lock file
     os.remove(pidfile_name)
