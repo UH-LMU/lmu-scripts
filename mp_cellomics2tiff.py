@@ -39,7 +39,7 @@ def cellomics2tiff((file_in,dir_out)):
         #FNULL = open(os.devnull,'w')
         #subprocess.call(cmd,  stdout=FNULL, shell=False)
         #FNULL.close()
-        cmd = '/opt/bftools/bfconvert -overwrite -nogroup %s %s > /dev/null'%(file_in,file_out)
+        cmd = 'bfconvert -overwrite -nogroup %s %s > /dev/null'%(file_in,file_out)
         #print cmd
         os.system(cmd)
     else:
