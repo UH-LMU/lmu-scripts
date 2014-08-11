@@ -170,7 +170,7 @@ if __name__=='__main__':
             print e.strerror
             
     # remove lock file
-    os.remove(PIDFILE)
+    os.remove(pidfile_name)
 
     print "stage_cellomics2tiff:","Done."
 
