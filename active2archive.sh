@@ -1,7 +1,7 @@
 #!/bin/bash
 
-activeroot=/input
-archiveroot=/output
+activeroot=/mnt/lmu-active-rw
+archiveroot=/mnt/lmu-archive-rw
 
 # test data
 active0=$activeroot/LMU-active2/archival-test
@@ -22,18 +22,22 @@ condition="-mtime -365"
 archive_user() {
     from="$1"
     to="$2"
-    echo $from $to
+    user="$3"
+    logdir="$4"
+    echo $from $to/$user
 
-    logdir=$to/log
-    mkdir -p "$logdir"
-    user=`basename "$from"`
+    # list of file that will be transferred
+    transferlist="$from/lmu-archive_${timestamp}_$user.txt"
+
+    # log file
     transferlog="$logdir/lmu-archive_${timestamp}_$user.log"
 
-    transferlist="$from/lmu-archive_$timestamp.txt"
-    find "$from" -type f $condition > "$transferlist"
-    cmd="rsync -rvn --files-from=\"$transferlist\" \"$from\" \"$to\" >& \"$transferlog\""
-    echo $cmd
-    $cmd
+    # find files to be transferred
+    cd "$from"
+    find . -type f $condition > "$transferlist"
+
+    # transfer based on the list
+    rsync -rv --files-from="$transferlist" . "$to/$user" >& "$transferlog"
 }
 
 
@@ -41,12 +45,16 @@ archive_user() {
 archive() {
     from=$1
     to=$2
+    logdir=$3
+    mkdir -p "$logdir"
+
     # http://stackoverflow.com/questions/301039/how-can-i-escape-white-space-in-a-bash-loop-list
-    while IFS= read -r -d '' n; do
-	archive_user "$n" "$to"
+    while IFS= read -r -d '' userdir; do
+	user=`basename "$userdir"`
+	archive_user "$userdir" "$to" "$user" "$logdir"
     done < <(find $from -mindepth 1 -maxdepth 1 -type d -print0)
 }
 
-archive $active0 $archive0 
-#archive $active1 $archive1
-#archive $active2 $archive2
+archive $active0 $archive0 $archive0/log
+#archive $active1 $archive1 $archive1/log
+#archive $active2 $archive2 $archive2/log
