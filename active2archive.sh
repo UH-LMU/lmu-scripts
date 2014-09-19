@@ -15,14 +15,25 @@ archive2=$archiveroot/LMU-archive2/users
 
 timestamp=`date +%Y%m%d%H%M`
 
+condition="-mtime +365"
+condition="-mtime -365"
+
 # archive a user folder
 archive_user() {
-    from=$1
-    to=$2
+    from="$1"
+    to="$2"
     echo $from $to
 
+    logdir=$to/log
+    mkdir -p "$logdir"
+    user=`basename "$from"`
+    transferlog="$logdir/lmu-archive_${timestamp}_$user.log"
+
     transferlist="$from/lmu-archive_$timestamp.txt"
-    find $from -mtime +365 > $transferlist
+    find "$from" -type f $condition > "$transferlist"
+    cmd="rsync -rvn --files-from=\"$transferlist\" \"$from\" \"$to\" >& \"$transferlog\""
+    echo $cmd
+    $cmd
 }
 
 
@@ -33,7 +44,7 @@ archive() {
     # http://stackoverflow.com/questions/301039/how-can-i-escape-white-space-in-a-bash-loop-list
     while IFS= read -r -d '' n; do
 	archive_user "$n" "$to"
-    done < <(find $from -maxdepth 1 -type d -print0)
+    done < <(find $from -mindepth 1 -maxdepth 1 -type d -print0)
 }
 
 archive $active0 $archive0 
