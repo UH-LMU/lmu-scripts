@@ -3,13 +3,14 @@
 usage() {
 echo "$0 [options] input_dir archive_dir"
 echo "Options:"
-echo "-n dry run"
-echo "-d delete from input_dir"
-echo "-l /LMU-active2/users split logs to subfolders"
+echo "-n 			dry run"
+echo "-d 			delete from input_dir"
+echo "-l /LMU-active2/users 	split logs to subfolders"
+echo "-t 200140903 		timestamp"
 exit 1
 }
 
-while getopts ":ndl:" opt; do
+while getopts ":ndl:t:" opt; do
 case $opt in
 n)
 OPT_DRY_RUN=1
@@ -20,6 +21,10 @@ OPT_REMOVE_SOURCE_FILES=1
 l)
 echo "-l was triggered, Parameter: $OPTARG" >&2
 OPT_LOG_SPLIT_ROOT=$OPTARG
+;;
+t)
+echo "-t was triggered, Parameter: $OPTARG" >&2
+OPT_TIMESTAMP=$OPTARG
 ;;
 \?)
 echo "Invalid option: -$OPTARG" >&2
@@ -59,9 +64,8 @@ if [ ! -w "$archive" ]; then
 fi
 
 
+timestamp=${OPT_TIMESTAMP:-`date +%Y%m%d%H%M`}
 
-timestamp=`date +%Y%m%d%H%M`
-timestamp=`date +%Y%m%d`
 transferlist="$active"/transfer_`basename "$active"`_"$timestamp".txt
 logfile="$active"/archive_`basename "$active"`_"$timestamp".log
 echo transferlist: "$transferlist"
@@ -83,4 +87,4 @@ if [ -n "$OPT_REMOVE_SOURCE_FILES" ]; then
 fi
 cmd="$cmd $active $archive >& $logfile"
 echo "$cmd"
-"$cmd"
+xargs "$cmd"
