@@ -92,7 +92,7 @@ if [ -n "$OPT_DRY_RUN" ]; then
 	cmd="$cmd --dry-run"
 fi
 if [ -n "$OPT_REMOVE_SOURCE_FILES" ]; then
-	echo using cmd="$cmd --remove-source-files"
+	cmd="$cmd --remove-source-files"
 fi
 cmd="$cmd $active $archive"
 echo rsync command: "$cmd >& $logfile"
