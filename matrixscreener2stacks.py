@@ -14,10 +14,122 @@ import tempfile
 import Tkinter, Tkconstants, tkFileDialog
 import shutil
 
-from dialogs import *
-from utils import *
+import Tkinter, Tkconstants, tkFileDialog
+from Tkinter import *
 
+class Matrix2StacksDialog(Tkinter.Frame):
+
+    def __init__(self, root, converter=None):
+
+        self.converter = converter
+
+        Tkinter.Frame.__init__(self, root)
+
+        # options for buttons
+        button_opt = {'fill': Tkconstants.BOTH, 'padx': 5, 'pady': 5}
+
+        self.DEFAULT_OUTPUTROOT = "OUTPUT ROOT DIRECTORY NOT SET"
+        self.vin = StringVar()
+        self.vin.set("INPUT DIRECTORY NOT SET")
+        self.voutroot = StringVar()
+        self.voutroot.set(self.DEFAULT_OUTPUTROOT)
+        self.vout = StringVar()
+        self.vout.set("OUTPUT DIRECTORY NOT SET")
+        self.voutleaf = StringVar()
+        self.vmask = StringVar()
+        self.vmask.set('*')
+        self.vwellcodes = IntVar()
+        self.vfirstwell = StringVar()
+        self.vfirstwell.set("A01")
+  
+        # define buttons
+        Tkinter.Button(self, text='Select input directory', command=self.askinputdirectory).pack(**button_opt)
+        Tkinter.Label(self, textvariable=self.vin).pack(**button_opt)
+        Tkinter.Label(self, text='File filter (e.g. *J07*)').pack(**button_opt)
+        Tkinter.Entry(self, textvariable=self.vmask).pack(**button_opt)
+        Tkinter.Button(self, text='Select output root directory', command=self.askoutputdirectory).pack(**button_opt)
+        Tkinter.Label(self, textvariable=self.voutroot).pack(**button_opt)
+        Tkinter.Label(self, textvariable=self.vout).pack(**button_opt)
+        Tkinter.Label(self, text="Prepend well and field codes").pack()
+        Tkinter.Checkbutton(self, text="Prepend well and field codes",variable=self.vwellcodes).pack()
         
+        Tkinter.Label(self, text="First well").pack()
+        Tkinter.Entry(self, textvariable=self.vfirstwell).pack()
+        
+        Tkinter.Button(self, text="Start conversion", command=self.startconversion).pack()
+
+
+        # defining options for opening a directory
+        self.dir_opt = options = {}
+        options['initialdir'] = 'C:\\'
+        options['mustexist'] = False
+        options['parent'] = root
+        options['title'] = 'Select directory'
+
+    def askinputdirectory(self):
+
+        """Returns a selected directoryname."""
+
+        dirname = tkFileDialog.askdirectory(**self.dir_opt)
+        head,tail = os.path.split(dirname)
+        self.vin.set(dirname)
+
+        if self.voutroot.get() == self.DEFAULT_OUTPUTROOT:
+            self.voutroot.set(head)
+
+        self.voutleaf.set(tail+ "_stacks")
+        self.vout.set(self.voutroot.get() + "/" + self.voutleaf.get())
+
+    def askoutputdirectory(self):
+
+        """Returns a selected directoryname."""
+
+        dirname = tkFileDialog.askdirectory(**self.dir_opt)
+        self.voutroot.set(dirname)
+        self.vout.set(self.voutroot.get() + "/" + self.voutleaf.get())
+
+    def startconversion(self):
+        print "Matrix2StacksDialog converting..."
+        print self.vin.get()
+        print self.vout.get()
+        print self.vwellcodes.get()
+        print self.vmask.get()
+        print self.vfirstwell.get()
+        
+        if self.converter != None:
+            self.converter.convert(self.vin.get(),self.vout.get(),self.vwellcodes.get(),self.vfirstwell.get(),self.vmask.get())
+ 
+class MatrixUtils:
+    rows = ['A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z']
+    refirstwell = re.compile('([A-Z])([0-9]+)')
+    rematrixwell = re.compile('U([0-9]+)--V([0-9]+)')
+    rematrixfield = re.compile('X([0-9]+)--Y([0-9]+)')
+
+
+    def wellcode(self,matrixname,firstwell='A01'):
+        result = re.search(self.rematrixwell,matrixname)
+        if result == None:
+            raise(Error("Well code not found: " + matrixname))
+        u = int(result.group(1))
+        v = int(result.group(2))
+                                                                                
+        result = re.search(self.refirstwell,firstwell)
+        if result == None:
+            raise(Error("Bad well code: " + firstwell))
+        offsetu = int(result.group(2))
+        offsetv = self.rows.index(result.group(1))
+
+        return self.rows[v+offsetv] + repr(u+offsetu).zfill(2)
+
+    def fieldcode(self,matrixname):
+        result = re.search(self.rematrixfield,matrixname)
+        if result == None:
+            raise(Error("Field code not found: " + matrixname))
+        x = int(result.group(1))
+        y = int(result.group(2))
+
+        return str(x)+str(y)
+
 
 class Matrix2StacksConverter:
 
@@ -35,7 +147,6 @@ class Matrix2StacksConverter:
             for old in olds:
                 os.remove(old)
 
-        abc = AbcIndex()
         mu = MatrixUtils()
 
         #logging.basicConfig(filename=stackDir+'/bfconvertMatrixScreener.log', format='%(levelname)s:%(message)s', level=logging.DEBUG)
@@ -57,8 +168,6 @@ class Matrix2StacksConverter:
             # define output file name
             head,tail = os.path.split(f)
             outputFile =  outputDir + "/" + tail + ".tif"
-            #if add_abc:
-             #   outputFile = outputFile.replace('image',  'image_'+abc.next())
             if add_well:
                 outputFile = outputFile.replace('image',  'image_'+mu.wellcode(outputFile,firstwell) + '_' + mu.fieldcode(outputFile))
 
@@ -178,6 +287,5 @@ if __name__=='__main__':
         root = Tkinter.Tk()
         Matrix2StacksDialog(root,converter).pack()
         root.mainloop()
-
 
 
