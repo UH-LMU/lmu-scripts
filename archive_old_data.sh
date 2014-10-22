@@ -79,7 +79,7 @@ echo logfile: "$logfile"
 echo
 
 # find files that are older than a year
-find "$active" -type f -mtime +365 > "$transferlist"
+find "$active" -type f -daystart -mtime +365 > "$transferlist"
 #find "$active" -type f -mtime -365 > "$transferlist"
 
 # edit file list so that paths start in the directory to be archived
