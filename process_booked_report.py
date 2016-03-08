@@ -119,6 +119,11 @@ def split_reservation(row):
     affiliation = row[H_AFFILIATION]
     overtime = row[H_OVERTIME]
 
+    # academic use by default
+    if affiliation == "":
+        affiliation = AFFILIATION_ACADEMIC
+    #print resource, start, end, affiliation, overtime
+
     # check if 3I Marianas is booked with lasers
     if resource == RESC_3I_MARIANAS:
         if row[H_LASERS_NONE] == "1":
@@ -236,11 +241,11 @@ for row in reader:
         """
         Create keys we can use for sorting.
         """
-        account = row[9]
+        account = row[10]
         begin = str(get_datetime(row[1]))
         reservation_id = row[5]
         key = "%s_%s_%s" % (account,begin,reservation_id)
-        #print key
+        #print key.encode('utf-8')
         content[key] = dict(zip(headers, row))
 
 print print_header().encode('utf-8')
