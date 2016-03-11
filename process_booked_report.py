@@ -44,6 +44,7 @@ H_DESCRIPTION = "Description"
 H_AFFILIATION = "Affiliation type"
 H_LASERS_NONE = "Laser-None"
 H_OVERTIME = "Overtime"
+H_RESERVATION_ID = "Reference Number"
 
 # these headers are defined for adding pricing data
 H_SECTION_BEGIN = "Section begin"
@@ -96,7 +97,10 @@ H_USER, H_TITLE,H_DESCRIPTION,H_RESOURCE,H_LASERS_NONE,H_BEGIN,H_END,\
 H_SECTION_BEGIN,H_SECTION_END,H_DURATION,H_PRICE_CATEGORY,H_AFFILIATION,H_PRICE_PER_HOUR,H_OVERTIME,H_PRICE_TOTAL]
 
 def get_datetime( instr ):
-    return datetime.fromtimestamp(mktime(strptime(instr, '%d/%m/%Y %H:%M:%S')))
+    try:
+        return datetime.fromtimestamp(mktime(strptime(instr, '%d/%m/%Y %H:%M:%S')))
+    except:
+        return datetime.fromtimestamp(mktime(strptime(instr, '%d/%m/%Y %H:%M')))
 
 def print_header():
     out = u''
@@ -236,14 +240,19 @@ for row in reader:
         headers = row
         headers[0]=headers[0].replace("u'\ufeff'","")
         #print headers
+
+        # find index of begin, account, reservation_id
+        i_account = headers.index(H_ACCOUNT)
+        i_begin = headers.index(H_BEGIN)
+        i_reservation_id = headers.index(H_RESERVATION_ID)
         firstRow = False
     else:
         """
         Create keys we can use for sorting.
         """
-        account = row[10]
-        begin = str(get_datetime(row[1]))
-        reservation_id = row[5]
+        account = row[i_account]
+        begin = str(get_datetime(row[i_begin]))
+        reservation_id = row[i_reservation_id]
         key = "%s_%s_%s" % (account,begin,reservation_id)
         #print key.encode('utf-8')
         content[key] = dict(zip(headers, row))
