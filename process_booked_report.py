@@ -117,6 +117,9 @@ def print_reservation(r):
     return out# + "\n"
 
 def split_reservation(row):
+    # remove newlines from description
+    row[H_DESCRIPTION] = row[H_DESCRIPTION].replace("\r\n","; ")
+
     resource = row[H_RESOURCE]
     start = row[H_BEGIN]
     end = row[H_END]
