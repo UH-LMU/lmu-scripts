@@ -33,6 +33,7 @@ RESC_3I_MARIANAS_WITH_LASERS="3I Marianas with lasers"
 # these must correspond with Booked report headers / attribute names
 H_ACCOUNT = "Account"
 H_USER = "User"
+H_PI = "PI"
 H_REMIT_AREA_CODE = "Remit area code"
 H_WBS = "WBS"
 H_RESOURCE = u'\ufeff"Resource"'
@@ -116,7 +117,7 @@ def print_reservation(r):
 
     return out# + "\n"
 
-def split_reservation(row):
+def split_reservation(row, billingInfo):
     # remove newlines from description
     row[H_DESCRIPTION] = row[H_DESCRIPTION].replace("\r\n","; ")
 
@@ -130,6 +131,27 @@ def split_reservation(row):
     if affiliation == "":
         affiliation = AFFILIATION_ACADEMIC
     #print resource, start, end, affiliation, overtime
+
+    # update billing info if given
+    if billingInfo != None:
+        # PI email used in Booked
+        pi = row[H_PI]
+        # account name used in OCF
+        account = row[H_ACCOUNT]
+
+        # try first PI email
+        rec = billingInfo.getRemitAreaCode(pi)
+        # try next account name
+        if rec == None:
+            rec = billingInfo.getRemitAreaCode(account)
+        if rec != None:
+            row[H_REMIT_AREA_CODE] = rec
+
+        wbs = billingInfo.getWBS(pi)
+        if wbs == None:
+            wbs = billingInfo.getWBS(account)
+        if wbs != None:
+            row[H_WBS] = wbs
 
     # check if 3I Marianas is booked with lasers
     if resource == RESC_3I_MARIANAS:
@@ -202,7 +224,58 @@ def unicode_csv_reader(utf8_data, dialect=csv.excel, **kwargs):
         yield [unicode(cell, 'utf-8') for cell in row]
 
 
+# Helper class for reading billing info from another file
+class BillingInfo:
+
+    WBSs = {}
+    remitAreaCodes = {}
+
+    def __init__(self, csvFile, keyColumn):
+        reader=unicode_csv_reader(open(csvFile))
+
+        firstRow = True
+        for row in reader:
+            # skip empty rows
+            if len(row) == 0:
+                continue
+
+            if firstRow:
+                """
+                If we are on the first line, create the headers list from the first row.
+                """
+                headers = row
+                headers[0]=headers[0].replace("u'\ufeff'","")
+                #print headers
+
+                # find index of begin, account, reservation_id
+                i_key = headers.index(keyColumn)
+                i_rec = headers.index(H_REMIT_AREA_CODE)
+                i_wbs = headers.index(H_WBS)
+                firstRow = False
+            else:
+                #print row[i_key].encode('utf-8'), row[i_rec].encode('utf-8'), row[i_wbs].encode('utf-8')
+                self.remitAreaCodes[row[i_key].encode('utf-8')] = row[i_rec].encode('utf-8')
+                self.WBSs[row[i_key].encode('utf-8')] = re.sub("[^0-9]", "", row[i_wbs].encode('utf-8'))
+
+        #print self.remitAreaCodes
+
+    def getRemitAreaCode(self, email):
+        if self.remitAreaCodes.has_key(email):
+            return self.remitAreaCodes[email]
+        else:
+            return None
+
+    def getWBS(self, email):
+        if self.WBSs.has_key(email):
+            return self.WBSs[email]
+        else:
+            return None
+
+
 csvFile = sys.argv[1]
+billingInfo = None
+if len(sys.argv) > 2:
+    billingInfo = BillingInfo(sys.argv[2], sys.argv[3])
 
 # remove BOM
 # http://stackoverflow.com/questions/8898294/convert-utf-8-with-bom-to-utf-8-with-no-bom-in-python
@@ -263,4 +336,4 @@ for row in reader:
 print print_header().encode('utf-8')
 sorted_keys = sorted(content.keys())
 for k in sorted_keys:
-    split_reservation(content[k])
+    split_reservation(content[k], billingInfo)
