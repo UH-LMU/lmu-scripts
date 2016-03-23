@@ -3,10 +3,13 @@ import codecs
 import copy
 import csv
 from datetime import datetime, timedelta, time
+from optparse import OptionParser
 import os
 import re
 import sys
 from time import mktime, strptime
+import Tkinter, Tkconstants, tkFileDialog
+from Tkinter import *
 
 # these must correspond with elomake field names
 AFFILIATION_ACADEMIC = "Academic"
@@ -103,126 +106,257 @@ def get_datetime( instr ):
     except:
         return datetime.fromtimestamp(mktime(strptime(instr, '%d/%m/%Y %H:%M')))
 
-def print_header():
-    out = u''
-    for c in OUTPUT_COLUMNS:
-        out = '%s,"%s"' % (out,c)
-
-    return out# + "\n"
-
-def print_reservation(r):
-    out = u''
-    for c in OUTPUT_COLUMNS:
-        out = '%s,"%s"' % (out,r[c])
-
-    return out# + "\n"
-
-def split_reservation(row, billingInfo):
-    # remove newlines from description
-    row[H_DESCRIPTION] = row[H_DESCRIPTION].replace("\r\n","; ")
-
-    resource = row[H_RESOURCE]
-    start = row[H_BEGIN]
-    end = row[H_END]
-    affiliation = row[H_AFFILIATION]
-    overtime = row[H_OVERTIME]
-
-    # academic use by default
-    if affiliation == "":
-        affiliation = AFFILIATION_ACADEMIC
-    #print resource, start, end, affiliation, overtime
-
-    # update billing info if given
-    if billingInfo != None:
-        # PI email used in Booked
-        pi = row[H_PI]
-        # account name used in OCF
-        account = row[H_ACCOUNT]
-
-        # try first PI email
-        rec = billingInfo.getRemitAreaCode(pi)
-        # try next account name
-        if rec == None:
-            rec = billingInfo.getRemitAreaCode(account)
-        if rec != None:
-            row[H_REMIT_AREA_CODE] = rec
-
-        wbs = billingInfo.getWBS(pi)
-        if wbs == None:
-            wbs = billingInfo.getWBS(account)
-        if wbs != None:
-            row[H_WBS] = wbs
-
-    # check if 3I Marianas is booked with lasers
-    if resource == RESC_3I_MARIANAS:
-        if row[H_LASERS_NONE] == "1":
-            resource = RESC_3I_MARIANAS_WITHOUT_LASERS
-        else:
-            resource = RESC_3I_MARIANAS_WITH_LASERS
-
-    start = get_datetime(start)
-    end = get_datetime(end)
-
-    # first define timepoints where prices can change
-    split_points = []
-    split_date = start.date()
-    while split_date <= end.date():
-        split_points.append( datetime.combine(split_date, time(8,0)))
-        split_points.append( datetime.combine(split_date, time(9,0)))
-        split_points.append( datetime.combine(split_date, time(17,0)))
-        split_points.append( datetime.combine(split_date, time(22,0)))
-
-        split_date = split_date + timedelta(days=1)
-    #print split_points
-
-    split_start = start
-    for i in range(0,len(split_points) - 1):
-        t1 = max(split_points[i],start)
-        t2 = min(split_points[i+1],end)
-
-        if t2 <= t1: continue
-
-        section = copy.deepcopy(row)
-        section[H_SECTION_BEGIN] = t1
-        section[H_SECTION_END] = t2
-
-        if t1.time() == time(22,0) and t2.time() == time(8,0):
-            section[H_PRICE_CATEGORY] = TIME_NIGHT
-            #print t1, t2, TIME_NIGHT
-
-        elif (t1.time() >= time(9,0) and t2.time() <= time(17,0)):
-            section[H_PRICE_CATEGORY] = TIME_PRIME
-            #print t1, t2, TIME_PRIME
-
-        else:
-            section[H_PRICE_CATEGORY] = TIME_OTHER
-            #print t1, t2, TIME_OTHER
-
-        price_per_hour = PRICE_LIST[affiliation][resource][section[H_PRICE_CATEGORY]]
-        section[H_PRICE_PER_HOUR] = price_per_hour
-        #print price_per_hour
-
-        duration = t2 - t1
-        section[H_DURATION] = duration
-        #print duration
-
-        overtime = 1
-        if section[H_OVERTIME] == 1:
-            price_per_hour = price_per_hour * 2
-            overtime = 2
-
-        price_total = float(duration.seconds) / (60*60) * price_per_hour * overtime
-        section[H_PRICE_TOTAL] = price_total
-        #print price_total
-
-        print print_reservation(section).encode('utf-8')
-
-
 def unicode_csv_reader(utf8_data, dialect=csv.excel, **kwargs):
     csv_reader = csv.reader(utf8_data, dialect=dialect, **kwargs)
     for row in csv_reader:
         yield [unicode(cell, 'utf-8') for cell in row]
 
+class BookedReportProcessorDialog(Tkinter.Frame):
+
+    def __init__(self, root, converter=None):
+
+        self.converter = converter
+
+        Tkinter.Frame.__init__(self, root)
+
+        # options for buttons
+        button_opt = {'fill': Tkconstants.BOTH, 'padx': 5, 'pady': 5}
+
+        self.vin1 = StringVar()
+        self.vin1.set("INPUT FILE NOT SET")
+        self.vin2 = StringVar()
+        self.vin2.set("")
+        self.vin3 = StringVar()
+        self.vin3.set("PI")
+
+        # define buttons
+        Tkinter.Button(self, text='Select report file', command=self.askinputfile1).pack(**button_opt)
+        Tkinter.Label(self, textvariable=self.vin1).pack(**button_opt)
+        Tkinter.Button(self, text='Select billing info file', command=self.askinputfile2).pack(**button_opt)
+        Tkinter.Label(self, textvariable=self.vin2).pack(**button_opt)
+        Tkinter.Label(self, text="Group key in billing info").pack()
+        Tkinter.Entry(self, textvariable=self.vin3).pack()
+
+        Tkinter.Button(self, text="Split report", command=self.startconversion).pack()
+
+        # defining options for opening a directory
+        self.file_opt = options = {}
+        options['initialdir'] = 'C:\\'
+        options['parent'] = root
+        options['title'] = 'Select file'
+        options['filetypes'] = [('csv files', '.csv')]
+
+    def askinputfile1(self):
+        filename = tkFileDialog.askopenfilename(**self.file_opt)
+        self.vin1.set(filename)
+
+    def askinputfile2(self):
+        filename = tkFileDialog.askopenfilename(**self.file_opt)
+        self.vin2.set(filename)
+
+    def startconversion(self):
+        print self.vin1.get()
+        print self.vin2.get()
+        print self.vin3.get()
+
+        csvFile = self.vin1.get()
+        billingInfo = None
+        if self.vin2.get() != "":
+            billingInfo = BillingInfo(self.vin2.get(), self.vin3.get())
+
+        processor = BookedReportProcessor(csvFile)
+        processor.process(billingInfo)
+
+        # if self.converter != None:
+        #     self.converter.convert(self.vin.get(),self.vout.get(),self.vwellcodes.get(),self.vfirstwell.get(),self.vmask.get())
+
+class BookedReportProcessor:
+
+    def __init__(self, csvFile):
+        self.csvFile = csvFile
+        head,tail = os.path.splitext(csvFile)
+        self.csvFileOut = head + "_split" + tail
+        #print self.csvFileOut
+
+        # remove BOM
+        # http://stackoverflow.com/questions/8898294/convert-utf-8-with-bom-to-utf-8-with-no-bom-in-python
+        BUFSIZE = 4096
+        BOMLEN = len(codecs.BOM_UTF8)
+
+        path = csvFile
+        with open(path, "r+b") as fp:
+            chunk = fp.read(BUFSIZE)
+            if chunk.startswith(codecs.BOM_UTF8):
+                i = 0
+                chunk = chunk[BOMLEN:]
+                while chunk:
+                    fp.seek(i)
+                    fp.write(chunk)
+                    i += len(chunk)
+                    fp.seek(BOMLEN, os.SEEK_CUR)
+                    chunk = fp.read(BUFSIZE)
+                fp.seek(-BOMLEN, os.SEEK_CUR)
+                fp.truncate()
+
+        headers = None
+        self.content = {}
+
+        #print('Reading file %s' % csvFile)
+        #reader=csv.reader(open(csvFile))
+        reader=unicode_csv_reader(open(csvFile))
+        firstRow = True
+        for row in reader:
+            # skip empty rows
+            if len(row) == 0:
+                continue
+
+            if firstRow:
+                """
+                If we are on the first line, create the headers list from the first row.
+                """
+                headers = row
+                headers[0]=headers[0].replace("u'\ufeff'","")
+                #print headers
+
+                # find index of begin, account, reservation_id
+                i_account = headers.index(H_ACCOUNT)
+                i_begin = headers.index(H_BEGIN)
+                i_reservation_id = headers.index(H_RESERVATION_ID)
+                firstRow = False
+                self.headers = headers
+            else:
+                """
+                Create keys we can use for sorting.
+                """
+                account = row[i_account]
+                begin = str(get_datetime(row[i_begin]))
+                reservation_id = row[i_reservation_id]
+                key = "%s_%s_%s" % (account,begin,reservation_id)
+                #print key.encode('utf-8')
+                self.content[key] = dict(zip(headers, row))
+
+
+    def print_header(self):
+        out = u''
+        for c in OUTPUT_COLUMNS:
+            out = '%s,"%s"' % (out,c)
+
+        return out# + "\n"
+
+    def print_reservation(self,r):
+        out = u''
+        for c in OUTPUT_COLUMNS:
+            out = '%s,"%s"' % (out,r[c])
+
+        return out# + "\n"
+
+    def split_reservation(self,row, billingInfo):
+        # remove newlines from description
+        row[H_DESCRIPTION] = row[H_DESCRIPTION].replace("\r\n","; ")
+
+        resource = row[H_RESOURCE]
+        start = row[H_BEGIN]
+        end = row[H_END]
+        affiliation = row[H_AFFILIATION]
+        overtime = row[H_OVERTIME]
+
+        # academic use by default
+        if affiliation == "":
+            affiliation = AFFILIATION_ACADEMIC
+        #print resource, start, end, affiliation, overtime
+
+        # update billing info if given
+        if billingInfo != None:
+            # PI email used in Booked
+            pi = row[H_PI]
+            # account name used in OCF
+            account = row[H_ACCOUNT]
+
+            # try first PI email
+            rec = billingInfo.getRemitAreaCode(pi)
+            # try next account name
+            if rec == None:
+                rec = billingInfo.getRemitAreaCode(account)
+            if rec != None:
+                row[H_REMIT_AREA_CODE] = rec
+
+            wbs = billingInfo.getWBS(pi)
+            if wbs == None:
+                wbs = billingInfo.getWBS(account)
+            if wbs != None:
+                row[H_WBS] = wbs
+
+        # check if 3I Marianas is booked with lasers
+        if resource == RESC_3I_MARIANAS:
+            if row[H_LASERS_NONE] == "1":
+                resource = RESC_3I_MARIANAS_WITHOUT_LASERS
+            else:
+                resource = RESC_3I_MARIANAS_WITH_LASERS
+
+        start = get_datetime(start)
+        end = get_datetime(end)
+
+        # first define timepoints where prices can change
+        split_points = []
+        split_date = start.date()
+        while split_date <= end.date():
+            split_points.append( datetime.combine(split_date, time(8,0)))
+            split_points.append( datetime.combine(split_date, time(9,0)))
+            split_points.append( datetime.combine(split_date, time(17,0)))
+            split_points.append( datetime.combine(split_date, time(22,0)))
+
+            split_date = split_date + timedelta(days=1)
+        #print split_points
+
+        split_start = start
+        for i in range(0,len(split_points) - 1):
+            t1 = max(split_points[i],start)
+            t2 = min(split_points[i+1],end)
+
+            if t2 <= t1: continue
+
+            section = copy.deepcopy(row)
+            section[H_SECTION_BEGIN] = t1
+            section[H_SECTION_END] = t2
+
+            if t1.time() == time(22,0) and t2.time() == time(8,0):
+                section[H_PRICE_CATEGORY] = TIME_NIGHT
+                #print t1, t2, TIME_NIGHT
+
+            elif (t1.time() >= time(9,0) and t2.time() <= time(17,0)):
+                section[H_PRICE_CATEGORY] = TIME_PRIME
+                #print t1, t2, TIME_PRIME
+
+            else:
+                section[H_PRICE_CATEGORY] = TIME_OTHER
+                #print t1, t2, TIME_OTHER
+
+            price_per_hour = PRICE_LIST[affiliation][resource][section[H_PRICE_CATEGORY]]
+            section[H_PRICE_PER_HOUR] = price_per_hour
+            #print price_per_hour
+
+            duration = t2 - t1
+            section[H_DURATION] = duration
+            #print duration
+
+            overtime = 1
+            if section[H_OVERTIME] == 1:
+                price_per_hour = price_per_hour * 2
+                overtime = 2
+
+            price_total = float(duration.seconds) / (60*60) * price_per_hour * overtime
+            section[H_PRICE_TOTAL] = price_total
+            #print price_total
+
+            return self.print_reservation(section).encode('utf-8')
+
+    def process(self, billingInfo):
+        output = open(self.csvFileOut, 'w')
+        print >> output, self.print_header().encode('utf-8')
+        sorted_keys = sorted(self.content.keys())
+        for k in sorted_keys:
+            print >> output, self.split_reservation(self.content[k], billingInfo)
+        output.close()
 
 # Helper class for reading billing info from another file
 class BillingInfo:
@@ -272,68 +406,30 @@ class BillingInfo:
             return None
 
 
-csvFile = sys.argv[1]
-billingInfo = None
-if len(sys.argv) > 2:
-    billingInfo = BillingInfo(sys.argv[2], sys.argv[3])
+if __name__=='__main__':
 
-# remove BOM
-# http://stackoverflow.com/questions/8898294/convert-utf-8-with-bom-to-utf-8-with-no-bom-in-python
-BUFSIZE = 4096
-BOMLEN = len(codecs.BOM_UTF8)
+    usage ="""%prog [options] input_directory
 
-path = sys.argv[1]
-with open(path, "r+b") as fp:
-    chunk = fp.read(BUFSIZE)
-    if chunk.startswith(codecs.BOM_UTF8):
-        i = 0
-        chunk = chunk[BOMLEN:]
-        while chunk:
-            fp.seek(i)
-            fp.write(chunk)
-            i += len(chunk)
-            fp.seek(BOMLEN, os.SEEK_CUR)
-            chunk = fp.read(BUFSIZE)
-        fp.seek(-BOMLEN, os.SEEK_CUR)
-        fp.truncate()
+    Split Booked report to prime, night and other time slots.
+    Run '%prog -h' for options.
+    """
 
-headers = None
-content = {}
+    parser = OptionParser(usage=usage)
+    parser.add_option('-i', '--input', help="Input report.")
+    parser.add_option('-b', '--billing', help="Billing info.")
+    parser.add_option('-k', '--key', help="Billing info group key.")
+    options, args = parser.parse_args()
 
-#print('Reading file %s' % csvFile)
-#reader=csv.reader(open(csvFile))
-reader=unicode_csv_reader(open(csvFile))
-firstRow = True
-for row in reader:
-    # skip empty rows
-    if len(row) == 0:
-        continue
+    # use command line arguments, if they were given
+    if options.input:
+        csvFile = options.input
+        billingInfo = None
+        if options.billing:
+            billingInfo = BillingInfo(options.billing, options.key)
 
-    if firstRow:
-        """
-        If we are on the first line, create the headers list from the first row.
-        """
-        headers = row
-        headers[0]=headers[0].replace("u'\ufeff'","")
-        #print headers
-
-        # find index of begin, account, reservation_id
-        i_account = headers.index(H_ACCOUNT)
-        i_begin = headers.index(H_BEGIN)
-        i_reservation_id = headers.index(H_RESERVATION_ID)
-        firstRow = False
+        processor = BookedReportProcessor(csvFile)
+        processor.process(billingInfo)
     else:
-        """
-        Create keys we can use for sorting.
-        """
-        account = row[i_account]
-        begin = str(get_datetime(row[i_begin]))
-        reservation_id = row[i_reservation_id]
-        key = "%s_%s_%s" % (account,begin,reservation_id)
-        #print key.encode('utf-8')
-        content[key] = dict(zip(headers, row))
-
-print print_header().encode('utf-8')
-sorted_keys = sorted(content.keys())
-for k in sorted_keys:
-    split_reservation(content[k], billingInfo)
+        root = Tkinter.Tk()
+        BookedReportProcessorDialog(root).pack()
+        root.mainloop()
