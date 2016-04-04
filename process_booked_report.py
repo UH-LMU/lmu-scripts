@@ -236,19 +236,19 @@ class BookedReportProcessor:
                 self.content[key] = dict(zip(headers, row))
 
 
-    def print_header(self):
+    def print_header(self,output):
         out = u''
         for c in OUTPUT_COLUMNS:
             out = '%s,"%s"' % (out,c)
 
-        return out# + "\n"
+        print >> output, out.encode('utf-8')
 
-    def print_reservation(self,r):
+    def print_reservation(self,r,output):
         out = u''
         for c in OUTPUT_COLUMNS:
             out = '%s,"%s"' % (out,r[c])
 
-        return out# + "\n"
+        print >> output, out.encode('utf-8')
 
     def split_reservation(self,row, billingInfo):
         # remove newlines from description
@@ -308,6 +308,7 @@ class BookedReportProcessor:
             split_date = split_date + timedelta(days=1)
         #print split_points
 
+        sections = []
         split_start = start
         for i in range(0,len(split_points) - 1):
             t1 = max(split_points[i],start)
@@ -323,7 +324,7 @@ class BookedReportProcessor:
                 section[H_PRICE_CATEGORY] = TIME_NIGHT
                 #print t1, t2, TIME_NIGHT
 
-            elif (t1.time() >= time(9,0) and t2.time() <= time(17,0)):
+            elif (t1.time() >= time(9,0) and t1.time() <= time(17,0) and t2.time() <= time(17,0)):
                 section[H_PRICE_CATEGORY] = TIME_PRIME
                 #print t1, t2, TIME_PRIME
 
@@ -348,14 +349,18 @@ class BookedReportProcessor:
             section[H_PRICE_TOTAL] = price_total
             #print price_total
 
-            return self.print_reservation(section).encode('utf-8')
+            sections.append(section)
+
+        return sections
 
     def process(self, billingInfo):
         output = open(self.csvFileOut, 'w')
-        print >> output, self.print_header().encode('utf-8')
+        self.print_header(output)
         sorted_keys = sorted(self.content.keys())
         for k in sorted_keys:
-            print >> output, self.split_reservation(self.content[k], billingInfo)
+            sections = self.split_reservation(self.content[k], billingInfo)
+            for s in sections:
+                self.print_reservation(s,output)
         output.close()
 
 # Helper class for reading billing info from another file
