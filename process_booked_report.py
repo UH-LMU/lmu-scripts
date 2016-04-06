@@ -298,6 +298,7 @@ class BookedReportProcessor:
 
         # first define timepoints where prices can change
         split_points = []
+        split_points.append(start)
         split_date = start.date()
         while split_date <= end.date():
             split_points.append( datetime.combine(split_date, time(8,0)))
@@ -306,6 +307,7 @@ class BookedReportProcessor:
             split_points.append( datetime.combine(split_date, time(22,0)))
 
             split_date = split_date + timedelta(days=1)
+        split_points.append(end)
         #print split_points
 
         sections = []
