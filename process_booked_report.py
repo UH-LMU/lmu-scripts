@@ -96,9 +96,15 @@ RESC_WORKSTATION_HCA:{TIME_PRIME:30,TIME_OTHER:18,TIME_NIGHT:18},\
 RESC_WORKSTATION_2D:{TIME_PRIME:18,TIME_OTHER:6,TIME_NIGHT:6},\
 }
 
+# these groups define how the reservations will be split
+SPLIT_NONE = (RESC_CELL_IQ, RESC_CELL_IQ_FLUOR)
+SPLIT_PRIME = (RESC_WORKSTATION_2D,RESC_WORKSTATION_3D,RESC_WORKSTATION_HCA,RESC_LEICA_DM6000)
+# other resources will have their reservations split in prime, night and other.
+
 OUTPUT_COLUMNS = [H_ACCOUNT,H_REMIT_AREA_CODE,H_WBS,\
 H_USER,H_RESOURCE,H_LASERS_NONE,H_BEGIN,H_END,\
 H_SECTION_BEGIN,H_SECTION_END,H_DURATION,H_PRICE_CATEGORY,H_AFFILIATION,H_PRICE_PER_HOUR,H_OVERTIME,H_PRICE_TOTAL,H_TITLE,H_DESCRIPTION]
+
 
 def get_datetime( instr ):
     try:
@@ -286,6 +292,7 @@ class BookedReportProcessor:
             if wbs != None:
                 row[H_WBS] = wbs
 
+
         # check if 3I Marianas is booked with lasers
         if resource == RESC_3I_MARIANAS:
             if row[H_LASERS_NONE] == "1":
@@ -296,21 +303,44 @@ class BookedReportProcessor:
         start = get_datetime(start)
         end = get_datetime(end)
 
+        # we will return the reservation sections in this array
+        sections = []
+
         # first define timepoints where prices can change
         split_points = []
-        split_points.append(start)
-        split_date = start.date()
-        while split_date <= end.date():
-            split_points.append( datetime.combine(split_date, time(8,0)))
-            split_points.append( datetime.combine(split_date, time(9,0)))
-            split_points.append( datetime.combine(split_date, time(17,0)))
-            split_points.append( datetime.combine(split_date, time(22,0)))
 
-            split_date = split_date + timedelta(days=1)
-        split_points.append(end)
+        #
+        # reservations are split differently on different instruments
+        #
+
+        # these cost the same always, so no need to split
+        if resource in SPLIT_NONE:
+            split_points.append(start)
+            split_points.append(end)
+        # these have two possibilities, prime or other
+        elif resource in SPLIT_PRIME:
+            split_points.append(start)
+            split_date = start.date()
+            while split_date <= end.date():
+                split_points.append( datetime.combine(split_date, time(9,0)))
+                split_points.append( datetime.combine(split_date, time(17,0)))
+
+                split_date = split_date + timedelta(days=1)
+            split_points.append(end)
+        # others can have prime, night, or other
+        else:
+            split_points.append(start)
+            split_date = start.date()
+            while split_date <= end.date():
+                split_points.append( datetime.combine(split_date, time(8,0)))
+                split_points.append( datetime.combine(split_date, time(9,0)))
+                split_points.append( datetime.combine(split_date, time(17,0)))
+                split_points.append( datetime.combine(split_date, time(22,0)))
+
+                split_date = split_date + timedelta(days=1)
+            split_points.append(end)
         #print split_points
 
-        sections = []
         split_start = start
         for i in range(0,len(split_points) - 1):
             t1 = max(split_points[i],start)
