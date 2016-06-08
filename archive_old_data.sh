@@ -5,12 +5,13 @@ echo "$0 [options] input_dir archive_dir"
 echo "Options:"
 echo "-n 			dry run"
 echo "-d 			delete from input_dir"
+echo "-m 365 	mtime, move files older than this"
 echo "-t 200140903 		timestamp"
 echo "-l LMU-active1 		label"
 exit 1
 }
 
-while getopts ":ndt:l:" opt; do
+while getopts ":ndt:m:l:" opt; do
 case $opt in
 n)
 OPT_DRY_RUN=1
@@ -21,6 +22,10 @@ OPT_REMOVE_SOURCE_FILES=1
 t)
 echo "-t was triggered, Parameter: $OPTARG" >&2
 OPT_TIMESTAMP=$OPTARG
+;;
+m)
+echo "-m was triggered, Parameter: $OPTARG" >&2
+OPT_MTIME=$OPTARG
 ;;
 l)
 echo "-l was triggered, Parameter: $OPTARG" >&2
@@ -69,17 +74,18 @@ fi
 
 
 timestamp=${OPT_TIMESTAMP:-`date +%Y%m%d%H%M`}
+mtime=${OPT_MTIME:-"365"}
 label=${OPT_LABEL:-`basename "$active"`}
 
 transferlist="$active"/transfer_`basename "$active"`_"$timestamp".txt
 logfile="$active"/archive_"$label"_"$timestamp".log
-echo 
+echo
 echo transferlist: "$transferlist"
 echo logfile: "$logfile"
 echo
 
 # find files that are older than a year
-find "$active" -type f -mtime +365 > "$transferlist"
+find "$active" -type f -daystart -mtime +${mtime} > "$transferlist"
 #find "$active" -type f -mtime -365 > "$transferlist"
 
 # edit file list so that paths start in the directory to be archived
@@ -123,5 +129,3 @@ split_log() {
 
 # split log file per subdirectories of the input folder
 split_log $logfile $active
-
-
