@@ -17,7 +17,7 @@ import shutil
 from dialogs import *
 from utils import *
 
-        
+
 
 class Matrix2StacksConverter:
 
@@ -25,7 +25,7 @@ class Matrix2StacksConverter:
         # regexp that defines a Matrix Screener field.
         reOME = re.compile('image--L([0-9]+)--S([0-9]+)--U([0-9]+)--V([0-9]+)--J([0-9]+)--E([0-9]+)--O([0-9]+)--X([0-9]+)--Y([0-9]+)--T([0-9]+)--Z([0-9]+)--C([0-9]+).ome.tif')
         reSlice = re.compile('image--L[0-9]+--S[0-9]+--U[0-9]+--V[0-9]+--J[0-9]+--E[0-9]+--O[0-9]+--X[0-9]+--Y[0-9]+--T[0-9]+--Z[0-9]+')
-        reField = re.compile('image--L[0-9]+--S[0-9]+--U[0-9]+--V[0-9]+--J[0-9]+--E[0-9]+--O[0-9]+--X[0-9]+--Y[0-9]+')
+        reField = re.compile('S[0-9]+--U[0-9]+--V[0-9]+--J[0-9]+--E[0-9]+--O[0-9]+--X[0-9]+--Y[0-9]+')
         reExp = re.compile('.*experiment--[0-9][0-9][0-9][0-9]_[0-9][0-9]_[0-9][0-9]_[0-9][0-9]_[0-9][0-9]_[0-9][0-9]')
 
         if not os.path.isdir(outputDir):
@@ -35,7 +35,6 @@ class Matrix2StacksConverter:
             for old in olds:
                 os.remove(old)
 
-        abc = AbcIndex()
         mu = MatrixUtils()
 
         #logging.basicConfig(filename=stackDir+'/bfconvertMatrixScreener.log', format='%(levelname)s:%(message)s', level=logging.DEBUG)
@@ -47,7 +46,7 @@ class Matrix2StacksConverter:
           for filename in fnmatch.filter(filenames, mask + '.tif'):
               result = reField.search(filename)
               fieldname = result.group(0)
-              fields.add(root + "/" + fieldname)
+              fields.add(fieldname)
 
         # temporary directory for conversions
         tmpdir = tempfile.mkdtemp()
@@ -55,20 +54,23 @@ class Matrix2StacksConverter:
         # loop over all wells
         for f in fields:
             # define output file name
-            head,tail = os.path.split(f)
-            outputFile =  outputDir + "/" + tail + ".tif"
-            #if add_abc:
-             #   outputFile = outputFile.replace('image',  'image_'+abc.next())
+            print "field " + f
+            outputFile = f
             if add_well:
-                outputFile = outputFile.replace('image',  'image_'+mu.wellcode(outputFile,firstwell) + '_' + mu.fieldcode(outputFile))
+                outputFile = mu.wellcode(f,firstwell) + '_' + mu.fieldcode(f) + '_' + f
+            outputFile =  outputDir + "/" + outputFile + ".tif"
 
             # find images belonging to this field
-            tifs = glob.glob(f + "*.ome.tif")
+            tifs = set()
+            for root, dirnames, filenames in os.walk(inputDir):
+              for filename in fnmatch.filter(filenames, "*" + f + "*.tif"):
+                  tifs.add(os.path.join(root,filename))
 
             # find different channels, slices and timepoints that are recorded for this field,
             # store filenames in memory
             _hyperstack = {}
             for t in tifs:
+                print "tif " + t
                 result = reOME.search(t)
                 timepointId = result.group(10)
                 sliceId = result.group(11)
@@ -86,7 +88,6 @@ class Matrix2StacksConverter:
 
                 # a slice contains all channels
                 _slice[channelId] = t
-                #_slice.append(t)
 
             # command to combine images of a field
             cmd_field = ['imgcnv','-o',outputFile,'-t','ome-tiff','-geometry','%d,%d'%(len(_timepoint),len(_hyperstack))]
@@ -97,9 +98,9 @@ class Matrix2StacksConverter:
 
                 # loop over all slices
                 for z in sorted(_timepoint.keys()):
-                    logging.debug("Field " + f)        
+                    logging.debug("Field " + f)
                     logging.debug("Timepoint " + t)
-                    logging.debug("Z-slice " + z)        
+                    logging.debug("Z-slice " + z)
                     _slice = _timepoint[z]
 
                     channels = sorted(_slice.keys())
@@ -108,14 +109,14 @@ class Matrix2StacksConverter:
                     slicefile = _slice[channels[0]]#_slice[0]
                     tmpfile = tmpdir + '/' + reSlice.search(slicefile).group(0) + '.tif'
 
-                    # command to combine channels  
+                    # command to combine channels
                     cmd = ['imgcnv','-o',tmpfile,'-t','ome-tiff']
 
                     c = channels.pop(0)
                     cmd.extend(['-i',_slice[c]])
                     for c in channels:
                         cmd.extend(['-c',_slice[c]])
-                        
+
                     logging.debug(" ".join(cmd))
 
                     if platform.system() == 'Linux':
@@ -125,7 +126,7 @@ class Matrix2StacksConverter:
 
                     # update the command that will combine all images of a field
                     cmd_field.extend(['-i',tmpfile])
-                    
+
 
             logging.debug(" ".join(cmd_field))
             if platform.system() == 'Linux':
@@ -135,7 +136,7 @@ class Matrix2StacksConverter:
 
         # remove temporary files
         shutil.rmtree(tmpdir)
-        
+
 
 
 
@@ -143,7 +144,7 @@ if __name__=='__main__':
 
     usage ="""%prog [options] input_directory
 
-    Convert MatrixScreener data to stacks, one multicolor stack per field. 
+    Convert MatrixScreener data to stacks, one multicolor stack per field.
     Run '%prog -h' for options.
     """
 
@@ -156,28 +157,25 @@ if __name__=='__main__':
     parser.add_option('-d', '--output_root', help="Directory where the stacks will be stored.")
     parser.add_option('-m', '--mask', default="*", help="Filename filter, e.g. *J07*.")
     options, args = parser.parse_args()
-    
+
     converter = Matrix2StacksConverter()
 
     # use command line arguments, if they were given
     if len(args) > 0:
-        inputdir = args[0]
-        print inputdir
+        inputDir = args[0]
+        print inputDir
 
         # output directory
-        head,tail = os.path.split(inputdir)
+        head,tail = os.path.split(inputDir)
         outputRoot = head
         if options.output_root:
-            outputRoot = options.output_root  
+            outputRoot = options.output_root
         outputDir = os.path.join(outputRoot, tail + "_stacks")
-            
+
         converter.convert(inputDir, outputDir, options.add_well, options.first_well, options.mask)
-        
+
     # otherwise use Tk to get the info from user
     else:
         root = Tkinter.Tk()
         Matrix2StacksDialog(root,converter).pack()
         root.mainloop()
-
-
-
