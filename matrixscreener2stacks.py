@@ -218,7 +218,7 @@ class Matrix2StacksConverter:
 
                     # use the part without the channel code as the file name
                     slicefile = _slice[channels[0]]#_slice[0]
-                    tmpfile = tmpdir + '/' + reSlice.search(slicefile).group(0) + '.tif'
+                    tmpfile = os.path.join(tmpdir, reSlice.search(slicefile).group(0) + '.tif')
 
                     # command to combine channels
                     cmd = ['imgcnv','-o',tmpfile,'-t','ome-tiff']
