@@ -378,7 +378,7 @@ class BookedReportProcessor:
                 overtime = 2
 
             price_total = float(duration.seconds) / (60*60) * price_per_hour * overtime
-            section[H_PRICE_TOTAL] = price_total
+            section[H_PRICE_TOTAL] = str(price_total).replace(".",",")
             #print price_total
 
             sections.append(section)
