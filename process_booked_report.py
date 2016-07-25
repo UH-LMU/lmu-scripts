@@ -101,7 +101,7 @@ SPLIT_NONE = (RESC_CELL_IQ, RESC_CELL_IQ_FLUOR)
 SPLIT_PRIME = (RESC_WORKSTATION_2D,RESC_WORKSTATION_3D,RESC_WORKSTATION_HCA,RESC_LEICA_DM6000)
 # other resources will have their reservations split in prime, night and other.
 
-OUTPUT_COLUMNS = [H_ACCOUNT,H_REMIT_AREA_CODE,H_WBS,\
+OUTPUT_COLUMNS = [H_ACCOUNT,H_PI,H_REMIT_AREA_CODE,H_WBS,\
 H_USER,H_RESOURCE,H_LASERS_NONE,H_BEGIN,H_END,\
 H_SECTION_BEGIN,H_SECTION_END,H_DURATION,H_PRICE_CATEGORY,H_AFFILIATION,H_PRICE_PER_HOUR,H_OVERTIME,H_PRICE_TOTAL,H_TITLE,H_DESCRIPTION]
 
@@ -292,6 +292,13 @@ class BookedReportProcessor:
             if wbs != None:
                 row[H_WBS] = wbs
 
+        # convert PI email to readable name
+        pi = row[H_PI]
+        pi = pi.replace("@helsinki.fi","")
+        pi = pi.replace("@mappi.helsinki.fi","")
+        pi = pi.replace(".", " ")
+        pi = pi.title()
+        row[H_PI] = pi
 
         # check if 3I Marianas is booked with lasers
         if resource == RESC_3I_MARIANAS:
