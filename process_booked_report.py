@@ -130,18 +130,10 @@ class BookedReportProcessorDialog(Tkinter.Frame):
 
         self.vin1 = StringVar()
         self.vin1.set("INPUT FILE NOT SET")
-        self.vin2 = StringVar()
-        self.vin2.set("")
-        self.vin3 = StringVar()
-        self.vin3.set("PI")
 
         # define buttons
         Tkinter.Button(self, text='Select report file', command=self.askinputfile1).pack(**button_opt)
         Tkinter.Label(self, textvariable=self.vin1).pack(**button_opt)
-        Tkinter.Button(self, text='Select billing info file', command=self.askinputfile2).pack(**button_opt)
-        Tkinter.Label(self, textvariable=self.vin2).pack(**button_opt)
-        Tkinter.Label(self, text="Group key in billing info").pack()
-        Tkinter.Entry(self, textvariable=self.vin3).pack()
 
         Tkinter.Button(self, text="Split report", command=self.startconversion).pack()
 
@@ -156,22 +148,12 @@ class BookedReportProcessorDialog(Tkinter.Frame):
         filename = tkFileDialog.askopenfilename(**self.file_opt)
         self.vin1.set(filename)
 
-    def askinputfile2(self):
-        filename = tkFileDialog.askopenfilename(**self.file_opt)
-        self.vin2.set(filename)
-
     def startconversion(self):
         print self.vin1.get()
-        print self.vin2.get()
-        print self.vin3.get()
-
         csvFile = self.vin1.get()
-        billingInfo = None
-        if self.vin2.get() != "":
-            billingInfo = BillingInfo(self.vin2.get(), self.vin3.get())
 
         processor = BookedReportProcessor(csvFile)
-        processor.process(billingInfo)
+        processor.process()
 
         # if self.converter != None:
         #     self.converter.convert(self.vin.get(),self.vout.get(),self.vwellcodes.get(),self.vfirstwell.get(),self.vmask.get())
@@ -256,7 +238,7 @@ class BookedReportProcessor:
 
         print >> output, out.encode('utf-8')
 
-    def split_reservation(self,row, billingInfo):
+    def split_reservation(self,row):
         # remove newlines from description
         row[H_DESCRIPTION] = row[H_DESCRIPTION].replace("\r\n","; ")
 
@@ -270,27 +252,6 @@ class BookedReportProcessor:
         if affiliation == "":
             affiliation = AFFILIATION_ACADEMIC
         #print resource, start, end, affiliation, overtime
-
-        # update billing info if given
-        if billingInfo != None:
-            # PI email used in Booked
-            pi = row[H_PI]
-            # account name used in OCF
-            account = row[H_ACCOUNT]
-
-            # try first PI email
-            rec = billingInfo.getRemitAreaCode(pi)
-            # try next account name
-            if rec == None:
-                rec = billingInfo.getRemitAreaCode(account)
-            if rec != None:
-                row[H_REMIT_AREA_CODE] = rec
-
-            wbs = billingInfo.getWBS(pi)
-            if wbs == None:
-                wbs = billingInfo.getWBS(account)
-            if wbs != None:
-                row[H_WBS] = wbs
 
         # convert PI email to readable name
         pi = row[H_PI]
@@ -395,62 +356,15 @@ class BookedReportProcessor:
 
         return sections
 
-    def process(self, billingInfo):
+    def process(self):
         output = open(self.csvFileOut, 'w')
         self.print_header(output)
         sorted_keys = sorted(self.content.keys())
         for k in sorted_keys:
-            sections = self.split_reservation(self.content[k], billingInfo)
+            sections = self.split_reservation(self.content[k])
             for s in sections:
                 self.print_reservation(s,output)
         output.close()
-
-# Helper class for reading billing info from another file
-class BillingInfo:
-
-    WBSs = {}
-    remitAreaCodes = {}
-
-    def __init__(self, csvFile, keyColumn):
-        reader=unicode_csv_reader(open(csvFile))
-
-        firstRow = True
-        for row in reader:
-            # skip empty rows
-            if len(row) == 0:
-                continue
-
-            if firstRow:
-                """
-                If we are on the first line, create the headers list from the first row.
-                """
-                headers = row
-                headers[0]=headers[0].replace("u'\ufeff'","")
-                #print headers
-
-                # find index of begin, account, reservation_id
-                i_key = headers.index(keyColumn)
-                i_rec = headers.index(H_REMIT_AREA_CODE)
-                i_wbs = headers.index(H_WBS)
-                firstRow = False
-            else:
-                #print row[i_key].encode('utf-8'), row[i_rec].encode('utf-8'), row[i_wbs].encode('utf-8')
-                self.remitAreaCodes[row[i_key].encode('utf-8')] = row[i_rec].encode('utf-8')
-                self.WBSs[row[i_key].encode('utf-8')] = re.sub("[^0-9]", "", row[i_wbs].encode('utf-8'))
-
-        #print self.remitAreaCodes
-
-    def getRemitAreaCode(self, email):
-        if self.remitAreaCodes.has_key(email):
-            return self.remitAreaCodes[email]
-        else:
-            return None
-
-    def getWBS(self, email):
-        if self.WBSs.has_key(email):
-            return self.WBSs[email]
-        else:
-            return None
 
 
 if __name__=='__main__':
@@ -463,19 +377,13 @@ if __name__=='__main__':
 
     parser = OptionParser(usage=usage)
     parser.add_option('-i', '--input', help="Input report.")
-    parser.add_option('-b', '--billing', help="Billing info.")
-    parser.add_option('-k', '--key', help="Billing info group key.")
     options, args = parser.parse_args()
 
     # use command line arguments, if they were given
     if options.input:
         csvFile = options.input
-        billingInfo = None
-        if options.billing:
-            billingInfo = BillingInfo(options.billing, options.key)
-
         processor = BookedReportProcessor(csvFile)
-        processor.process(billingInfo)
+        processor.process()
     else:
         root = Tkinter.Tk()
         BookedReportProcessorDialog(root).pack()
