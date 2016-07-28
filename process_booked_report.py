@@ -257,7 +257,7 @@ class BookedReportProcessor:
         pi = row[H_PI]
         pi = pi.replace("@helsinki.fi","")
         pi = pi.replace("@mappi.helsinki.fi","")
-        pi = pi.replace(".", " ")
+        pi = pi[pi.rfind(".")+1:]
         pi = pi.title()
         row[H_PI] = pi
 
