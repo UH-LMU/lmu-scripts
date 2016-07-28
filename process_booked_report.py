@@ -320,9 +320,20 @@ class BookedReportProcessor:
             section[H_SECTION_BEGIN] = t1
             section[H_SECTION_END] = t2
 
+            duration = t2 - t1
+
             if t1.time() == time(22,0) and t2.time() == time(8,0):
                 section[H_PRICE_CATEGORY] = TIME_NIGHT
                 #print t1, t2, TIME_NIGHT
+
+            # not complete 22 - 08 night time reservation
+            elif (t1.time() >= time(22,0) or t1.time() < time(8,0)) and t2.time() <= time(8,0):
+                night_rate = PRICE_LIST[affiliation][resource][TIME_NIGHT]
+                other_rate = PRICE_LIST[affiliation][resource][TIME_OTHER]
+                if duration.total_seconds() * other_rate < 10 * 60 * 60 * night_rate:
+                    section[H_PRICE_CATEGORY] = TIME_OTHER
+                else:
+                    section[H_PRICE_CATEGORY] = TIME_NIGHT
 
             elif (t1.time() >= time(9,0) and t1.time() <= time(17,0) and t2.time() <= time(17,0)):
                 section[H_PRICE_CATEGORY] = TIME_PRIME
@@ -336,7 +347,6 @@ class BookedReportProcessor:
             section[H_PRICE_PER_HOUR] = price_per_hour
             #print price_per_hour
 
-            duration = t2 - t1
             #print type(duration), duration
 
             overtime = 1
