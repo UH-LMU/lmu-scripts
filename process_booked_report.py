@@ -48,7 +48,7 @@ H_DESCRIPTION = "Description"
 H_AFFILIATION = "Affiliation type"
 H_LASERS_NONE = "Laser-None"
 H_OVERTIME = "Overtime"
-H_RESERVATION_ID = "Reference Number"
+H_RESERVATION_ID = "ReferenceNumber"
 
 # these headers are defined for adding pricing data
 H_SECTION_BEGIN = "Section begin"
