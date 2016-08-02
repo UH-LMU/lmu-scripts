@@ -354,11 +354,9 @@ class BookedReportProcessor:
                 price_per_hour = price_per_hour * 2
                 overtime = 2
 
-            price_total = float(duration.total_seconds()) / (60*60) * price_per_hour * overtime
-            d_minutes = duration.seconds / 60
-            d_hours = d_minutes / 60
-            d_minutes = d_minutes % 60
-            section[H_DURATION] = "%d:%d:00" % (duration.days * 24 + d_hours, d_minutes)
+            duration_hours = float(duration.total_seconds()) / (60*60)
+            price_total = duration_hours * price_per_hour * overtime
+            section[H_DURATION] = str(duration_hours).replace(".",",")
             section[H_PRICE_TOTAL] = str(price_total).replace(".",",")
             #print price_total
 
