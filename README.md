@@ -1,7 +1,7 @@
 lmu-scripts
 ===========
 
-Image analysis scripts for LMU workstations
+All kinds of scripts for LMU.
 
 Test
 
