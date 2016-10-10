@@ -338,6 +338,9 @@ class BookedReportProcessor:
                 else:
                     section[H_PRICE_CATEGORY] = TIME_NIGHT
 
+            elif resource in SPLIT_PRIME and t1.time() >= time(17,0):
+                section[H_PRICE_CATEGORY] = TIME_OTHER
+
             elif (t1.time() >= time(9,0) and t1.time() <= time(17,0) and t2.time() <= time(17,0)):
                 section[H_PRICE_CATEGORY] = TIME_PRIME
                 #print t1, t2, TIME_PRIME
