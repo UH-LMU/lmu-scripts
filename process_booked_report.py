@@ -15,7 +15,7 @@ from Tkinter import *
 AFFILIATION_ACADEMIC = "Academic"
 AFFILIATION_PRIVATE = "Private company"
 
-# these must correspond with booked-lmu/lmu/constants.php
+# these must correspond to resource names in Booked
 RESC_WORKSTATION_3D="3D Workstation"
 RESC_WORKSTATION_2D="2D Workstation"
 RESC_WORKSTATION_HCA="HCA Workstation"
