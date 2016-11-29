@@ -71,14 +71,14 @@ RESC_LEICA_SP5_MP:{TIME_PRIME:22,TIME_OTHER:17,TIME_NIGHT:12.5},\
 RESC_LEICA_SP5_HCS:{TIME_PRIME:22,TIME_OTHER:17,TIME_NIGHT:12.5},\
 RESC_ZEISS_LSM_700:{TIME_PRIME:18,TIME_OTHER:14,TIME_NIGHT:10},\
 RESC_3I_MARIANAS_WITH_LASERS:{TIME_PRIME:18,TIME_OTHER:14,TIME_NIGHT:10},\
-RESC_3I_MARIANAS_WITHOUT_LASERS:{TIME_PRIME:9,TIME_OTHER:6,TIME_NIGHT:4.5},\
-RESC_LEICA_DM6000:{TIME_PRIME:3,TIME_OTHER:1,TIME_NIGHT:1},\
+RESC_3I_MARIANAS_WITHOUT_LASERS:{TIME_PRIME:9,TIME_OTHER:6,TIME_NIGHT:5},\
+RESC_LEICA_DM6000:{TIME_PRIME:4,TIME_OTHER:2,TIME_NIGHT:2},\
 RESC_CELLINSIGHT:{TIME_PRIME:9,TIME_OTHER:6,TIME_NIGHT:5},\
 RESC_CELL_IQ:{TIME_PRIME:2,TIME_OTHER:2,TIME_NIGHT:2},\
 RESC_CELL_IQ_FLUOR:{TIME_PRIME:2,TIME_OTHER:2,TIME_NIGHT:2},\
 RESC_WORKSTATION_3D:{TIME_PRIME:5,TIME_OTHER:3,TIME_NIGHT:3},\
 RESC_WORKSTATION_LS:{TIME_PRIME:5,TIME_OTHER:3,TIME_NIGHT:3},\
-RESC_WORKSTATION_HCA:{TIME_PRIME:5,TIME_OTHER:3,TIME_NIGHT:3},\
+RESC_WORKSTATION_HCA:{TIME_PRIME:3,TIME_OTHER:1,TIME_NIGHT:1},\
 RESC_WORKSTATION_2D:{TIME_PRIME:3,TIME_OTHER:1,TIME_NIGHT:1},\
 }
 # http://www.biocenter.helsinki.fi/bi/lmu/prices_comm.htm
@@ -160,6 +160,12 @@ class BookedReportProcessorDialog(Tkinter.Frame):
 
         # if self.converter != None:
         #     self.converter.convert(self.vin.get(),self.vout.get(),self.vwellcodes.get(),self.vfirstwell.get(),self.vmask.get())
+
+def next_weekday(d, weekday):
+    days_ahead = weekday - d.weekday()
+    if days_ahead <= 0: # Target day already happened this week
+        days_ahead += 7
+    return d + timedelta(days_ahead)
 
 class BookedReportProcessor:
 
@@ -246,15 +252,15 @@ class BookedReportProcessor:
         row[H_DESCRIPTION] = row[H_DESCRIPTION].replace("\r\n","; ")
 
         resource = row[H_RESOURCE]
-        start = row[H_BEGIN]
-        end = row[H_END]
+        start = get_datetime(row[H_BEGIN])
+        end = get_datetime(row[H_END])
         affiliation = row[H_AFFILIATION]
         overtime = row[H_OVERTIME]
 
         # academic use by default
         if affiliation == "":
             affiliation = AFFILIATION_ACADEMIC
-        #print resource, start, end, affiliation, overtime
+        print resource, start, end, affiliation, overtime
 
         # convert PI email to readable name
         pi = row[H_PI]
@@ -271,9 +277,6 @@ class BookedReportProcessor:
             else:
                 resource = RESC_3I_MARIANAS_WITH_LASERS
 
-        start = get_datetime(start)
-        end = get_datetime(end)
-
         # we will return the reservation sections in this array
         sections = []
 
@@ -286,87 +289,120 @@ class BookedReportProcessor:
 
         # these cost the same always, so no need to split
         if resource in SPLIT_NONE:
-            split_points.append(start)
-            split_points.append(end)
+            section = copy.deepcopy(row)
+            section[H_SECTION_BEGIN] = get_datetime(section[H_BEGIN])
+            section[H_SECTION_END] = get_datetime(section[H_END])
+            section[H_PRICE_CATEGORY] = TIME_PRIME
+            sections.append(section)
+
         # these have two possibilities, prime or other
         elif resource in SPLIT_PRIME:
-            split_points.append(start)
-            split_date = start.date()
-            while split_date <= end.date():
-                split_points.append( datetime.combine(split_date, time(9,0)))
-                split_points.append( datetime.combine(split_date, time(17,0)))
+            section_start = start
+            section_end = start
+            while section_end < end:
+                test09 = datetime.combine(section_start.date(), time(9,0))
+                test17 = datetime.combine(section_start.date(), time(17,0))
+                section = copy.deepcopy(row)
+                section[H_SECTION_BEGIN] = section_start
 
-                split_date = split_date + timedelta(days=1)
-            split_points.append(end)
-        # others can have prime, night, or other
-        else:
-            split_points.append(start)
-            split_date = start.date()
-            while split_date <= end.date():
-                split_points.append( datetime.combine(split_date, time(8,0)))
-                split_points.append( datetime.combine(split_date, time(9,0)))
-                split_points.append( datetime.combine(split_date, time(17,0)))
-                split_points.append( datetime.combine(split_date, time(22,0)))
-
-                split_date = split_date + timedelta(days=1)
-            split_points.append(end)
-        #print split_points
-
-        split_start = start
-        for i in range(0,len(split_points) - 1):
-            t1 = max(split_points[i],start)
-            t2 = min(split_points[i+1],end)
-
-            if t2 <= t1: continue
-
-            section = copy.deepcopy(row)
-            section[H_SECTION_BEGIN] = t1
-            section[H_SECTION_END] = t2
-
-            duration = t2 - t1
-
-            if t1.time() == time(22,0) and t2.time() == time(8,0):
-                section[H_PRICE_CATEGORY] = TIME_NIGHT
-                #print t1, t2, TIME_NIGHT
-
-            # not complete 22 - 08 night time reservation
-            elif (t1.time() >= time(22,0) or t1.time() < time(8,0)) and t2.time() <= time(8,0):
-                night_rate = PRICE_LIST[affiliation][resource][TIME_NIGHT]
-                other_rate = PRICE_LIST[affiliation][resource][TIME_OTHER]
-                if duration.total_seconds() * other_rate < 10 * 60 * 60 * night_rate:
+                # work days
+                if section_start.weekday() in (0,1,2,3,4):
+                    # morning
+                    if section_start < test09:
+                        section[H_PRICE_CATEGORY] = TIME_OTHER
+                        section[H_SECTION_END] = min(end,test09)
+                    # prime time
+                    elif section_start < test17:
+                        section[H_PRICE_CATEGORY] = TIME_PRIME
+                        section[H_SECTION_END] = min(end,test17)
+                    # other time
+                    elif section_start >= test17:
+                        section[H_PRICE_CATEGORY] = TIME_OTHER
+                        next_day = section_start.date() + timedelta(days=1)
+                        next_day_09 = datetime.combine(next_day, time(9,0))
+                        section[H_SECTION_END] = min(end,next_day_09)
+                # weekends and holidays
+                elif section_start.weekday() in (5,6):
                     section[H_PRICE_CATEGORY] = TIME_OTHER
-                else:
+                    next_monday = next_weekday(section_start.date(),0)
+                    next_monday_09 = datetime.combine(next_monday, time(9,0))
+                    section[H_SECTION_END] = min(end,next_monday_09)
+
+                # store section
+                sections.append(section)
+                # start point for next section
+                section_start = section[H_SECTION_END]
+                # loop termination variable
+                section_end = section[H_SECTION_END]
+
+                print section[H_SECTION_BEGIN], section[H_SECTION_END]
+
+        # others have three possibilities: prime, night or other
+        else:
+            print "end: ", end
+            section_start = start
+            section_end = start
+            while section_end < end:
+                test08 = datetime.combine(section_start.date(), time(8,0))
+                test09 = datetime.combine(section_start.date(), time(9,0))
+                test17 = datetime.combine(section_start.date(), time(17,0))
+                test22 = datetime.combine(section_start.date(), time(22,0))
+                section = copy.deepcopy(row)
+                section[H_SECTION_BEGIN] = section_start
+
+                # morning
+                if section_start < test08:
                     section[H_PRICE_CATEGORY] = TIME_NIGHT
+                    section[H_SECTION_END] = min(end,test08)
+                # weekdays and holidays
+                elif section_start.weekday() in (0,1,2,3,4):
+                    if section_start < test09:
+                        section[H_PRICE_CATEGORY] = TIME_OTHER
+                        section[H_SECTION_END] = min(end,test09)
+                    elif section_start < test17:
+                        section[H_PRICE_CATEGORY] = TIME_PRIME
+                        section[H_SECTION_END] = min(end,test17)
+                    elif section_start < test22:
+                        section[H_PRICE_CATEGORY] = TIME_OTHER
+                        section[H_SECTION_END] = min(end,test22)
+                # weekends
+                elif section_start.weekday() in (5,6):
+                    if section_start < test22:
+                        section[H_PRICE_CATEGORY] = TIME_OTHER
+                        section[H_SECTION_END] = min(end,test22)
+                # night time
+                if section_start >= test22:
+                    print "night"
+                    section[H_PRICE_CATEGORY] = TIME_NIGHT
+                    next_day = section_start.date() + timedelta(days=1)
+                    next_day_08 = datetime.combine(next_day, time(8,0))
+                    section[H_SECTION_END] = min(end,next_day_08)
 
-            elif resource in SPLIT_PRIME and t1.time() >= time(17,0):
-                section[H_PRICE_CATEGORY] = TIME_OTHER
+                # store section
+                sections.append(section)
+                # start point for next section
+                section_start = section[H_SECTION_END]
+                # loop termination variable
+                section_end = section[H_SECTION_END]
 
-            elif (t1.time() >= time(9,0) and t1.time() <= time(17,0) and t2.time() <= time(17,0)):
-                section[H_PRICE_CATEGORY] = TIME_PRIME
-                #print t1, t2, TIME_PRIME
+                print section[H_SECTION_BEGIN], section[H_SECTION_END]
 
-            else:
-                section[H_PRICE_CATEGORY] = TIME_OTHER
-                #print t1, t2, TIME_OTHER
 
+
+        # add pricing info to sections
+        for section in sections:
             price_per_hour = PRICE_LIST[affiliation][resource][section[H_PRICE_CATEGORY]]
             section[H_PRICE_PER_HOUR] = price_per_hour
-            #print price_per_hour
-
-            #print type(duration), duration
-
+            duration = section[H_SECTION_END] - section[H_SECTION_BEGIN]
             overtime = 1
             if section[H_OVERTIME] == 1:
                 price_per_hour = price_per_hour * 2
                 overtime = 2
-
             duration_hours = float(duration.total_seconds()) / (60*60)
             price_total = duration_hours * price_per_hour * overtime
             section[H_DURATION] = str(duration_hours).replace(".",",")
             section[H_PRICE_TOTAL] = str(price_total).replace(".",",")
             #print price_total
-
-            sections.append(section)
 
         return sections
 
