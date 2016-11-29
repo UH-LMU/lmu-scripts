@@ -263,7 +263,7 @@ class BookedReportProcessor:
         # academic use by default
         if affiliation == "":
             affiliation = AFFILIATION_ACADEMIC
-        print resource, start, end, affiliation, overtime
+        #print resource, start, end, affiliation, overtime
 
         # convert PI email to readable name
         pi = row[H_PI]
@@ -338,11 +338,11 @@ class BookedReportProcessor:
                 # loop termination variable
                 section_end = section[H_SECTION_END]
 
-                print section[H_SECTION_BEGIN], section[H_SECTION_END]
+                #print section[H_SECTION_BEGIN], section[H_SECTION_END]
 
         # others have three possibilities: prime, night or other
         else:
-            print "end: ", end
+            #print "end: ", end
             section_start = start
             section_end = start
             while section_end < end:
@@ -375,7 +375,7 @@ class BookedReportProcessor:
                         section[H_SECTION_END] = min(end,test22)
                 # night time
                 if section_start >= test22:
-                    print "night"
+                    #print "night"
                     section[H_PRICE_CATEGORY] = TIME_NIGHT
                     next_day = section_start.date() + timedelta(days=1)
                     next_day_08 = datetime.combine(next_day, time(8,0))
@@ -388,7 +388,7 @@ class BookedReportProcessor:
                 # loop termination variable
                 section_end = section[H_SECTION_END]
 
-                print section[H_SECTION_BEGIN], section[H_SECTION_END]
+                #print section[H_SECTION_BEGIN], section[H_SECTION_END]
 
 
 
@@ -397,12 +397,11 @@ class BookedReportProcessor:
             price_per_hour = PRICE_LIST[affiliation][resource][section[H_PRICE_CATEGORY]]
             section[H_PRICE_PER_HOUR] = price_per_hour
             duration = section[H_SECTION_END] - section[H_SECTION_BEGIN]
-            overtime = 1
-            if section[H_OVERTIME] == 1:
+            if section[H_OVERTIME] == "1":
+                #print "overtime"
                 price_per_hour = price_per_hour * 2
-                overtime = 2
             duration_hours = float(duration.total_seconds()) / (60*60)
-            price_total = duration_hours * price_per_hour * overtime
+            price_total = duration_hours * price_per_hour
             section[H_DURATION] = str(duration_hours).replace(".",",")
             section[H_PRICE_TOTAL] = str(price_total).replace(".",",")
             #print price_total
