@@ -9,6 +9,7 @@ use DateTime::Format::DateParse;
 use DateTime::Format::Duration;
 use Text::CSV;
 
+# perl ~/GitHub/lmu-scripts/latest_use.pl ~/Downloads/resource_lastdate_user.csv ~/user_permissions.csv |grep -v Workstation>latest_use.csv
 
 my $csv = Text::CSV->new({
   sep_char => ',',
