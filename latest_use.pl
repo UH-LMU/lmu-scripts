@@ -18,13 +18,15 @@ my $csv = Text::CSV->new({
   binary => 1
  });
 
-my $file = $ARGV[0] or die "Need to get CSV file on the command line\n";
+my $file = $ARGV[0] or die "Need to get reservations CSV file on the command line\n";
 my $file2 = $ARGV[1] or die "Need to get user permissions CSV file on the command line\n";
 
 my %reservations;
 my %permissions;
+my %displaynames;
 my $now = DateTime->now;
 
+# This reads Booked reservations report. Users are listed Firstname Lastname
 open(my $data, '<:encoding(utf8)', $file) or die "Could not open '$file' $!\n";
 while (my $line = <$data>) {
   #chomp $line;
@@ -33,13 +35,13 @@ while (my $line = <$data>) {
   if ($csv->parse($line)) {
 
       my @fields = $csv->fields();
-      my $user = $fields[6];
+      my $firstlast = $fields[6];
       my $resource = $fields[0];
       my $datetime = $fields[2];
 
       my ($date,$time) = split / /, $datetime;
       my ($day,$month,$year) = split /\//, $date;
-      #print "found: ", $user, $resource, $datetime,$day,$month,$year, "\n";
+      #print "found: ", $firstlast, $resource, $datetime,$day,$month,$year, "\n";
 
       my $dt = DateTime->new(
             year       => $year,
@@ -56,7 +58,7 @@ while (my $line = <$data>) {
       #my $format = DateTime::Format::Duration->new(pattern => '%Y years, %m months, %e days, %H hours, %M minutes, %S seconds');
       my $format = DateTime::Format::Duration->new(pattern => '%m');
       #my $format = DateTime::Format::Duration->new(pattern => '%e days');
-      $reservations{$user}{$resource} = $format->format_duration($duration);
+      $reservations{$firstlast}{$resource} = $format->format_duration($duration);
 
   } else {
       warn "Line could not be parsed: $line\n";
@@ -71,10 +73,12 @@ while (my $line = <$data2>) {
   if ($csv->parse($line)) {
 
       my @fields = $csv->fields();
-      my $user = shift @fields;
-      $permissions{$user} = \@fields;
-      # print "$user\n";
-      # print Dumper \@permissions{$user};
+      my $firstlast = shift @fields;
+      my $lastfirst = shift @fields;
+      $permissions{$firstlast} = \@fields;
+      $displaynames{$lastfirst} = $firstlast;
+      # print "$firstlast\n";
+      # print Dumper \@permissions{$firstlast};
       # print "---\n";
 
   } else {
@@ -87,18 +91,20 @@ while (my $line = <$data2>) {
 #print "----------------\n";
 
 
-foreach my $user (sort keys %permissions) {
-  foreach my $resource (@{$permissions{$user}}) {
-    # print "$user, $resource";
-    # print ", joo" if defined $reservations{$user}{$resource};
+foreach my $firstlast (sort keys %permissions) {
+  foreach my $resource (@{$permissions{$firstlast}}) {
+    # print "$firstlast, $resource";
+    # print ", joo" if defined $reservations{$firstlast}{$resource};
     # print "\n";
-    $reservations{$user}{$resource} = "100"
-      unless defined $reservations{$user}{$resource};
+    $reservations{$firstlast}{$resource} = "100"
+      unless defined $reservations{$firstlast}{$resource};
   }
 }
-foreach my $user (sort keys %reservations) {
-    foreach my $resource (keys %{ $reservations{$user} }) {
-        print "$user, $resource, $reservations{$user}{$resource}\n";
+
+foreach my $lastfirst (sort keys %displaynames) {
+    my $firstlast = $displaynames{$lastfirst};
+    foreach my $resource (keys %{ $reservations{$firstlast} }) {
+        print "$lastfirst,$resource,$reservations{$firstlast}{$resource}\n";
     }
     print ",,\n";
 }
