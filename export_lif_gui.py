@@ -4,9 +4,12 @@ from ij.io import DirectoryChooser,OpenDialog
 
 def main():
     """
-    Fiji -> Plugins -> Import... iterate_lif.py
-    Fiji -> Plugins -> Import... export_lif.py
-    Fiji -> New -> Script
+    Download iterate_lif.py, export_lif.py and export_lif_gui.py.
+
+    Then in Fiji:
+    Plugins -> Install Plugin... iterate_lif.py
+    Plugins -> Install Plugin... export_lif.py
+    File -> New -> Script...
     Script Editor -> File -> Open... export_lif_gui.py
     Script Editor -> Run
     """
