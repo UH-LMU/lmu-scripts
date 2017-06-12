@@ -5,6 +5,7 @@ import csv
 from datetime import datetime, timedelta, time
 from optparse import OptionParser
 import os
+from pprint import pprint
 import re
 import sys
 from time import mktime, strptime
@@ -25,6 +26,7 @@ RESC_ZEISS_LSM_700="Zeiss LSM 700"
 RESC_LEICA_SP5="Leica TCS SP5"
 RESC_LEICA_SP5_MP="Leica TCS SP5 MP SMD FLIM"
 RESC_LEICA_SP5_HCS="Leica SP5 II HCS A"
+RESC_LEICA_SP8_STED="Leica SP8 STED"
 RESC_CELL_IQ="Cell-IQ"
 RESC_CELL_IQ_FLUOR="Cell-IQ Fluorescence"
 RESC_CELLINSIGHT="CellInsight"
@@ -70,6 +72,7 @@ PRICE_LIST[AFFILIATION_ACADEMIC] = {\
 RESC_LEICA_SP5:{TIME_PRIME:22,TIME_OTHER:17,TIME_NIGHT:13},\
 RESC_LEICA_SP5_MP:{TIME_PRIME:22,TIME_OTHER:17,TIME_NIGHT:13},\
 RESC_LEICA_SP5_HCS:{TIME_PRIME:22,TIME_OTHER:17,TIME_NIGHT:13},\
+RESC_LEICA_SP8_STED:{TIME_PRIME:22,TIME_OTHER:17,TIME_NIGHT:13},\
 RESC_ZEISS_LSM_700:{TIME_PRIME:18,TIME_OTHER:14,TIME_NIGHT:10},\
 RESC_ZEISS_LS_Z1:{TIME_PRIME:18,TIME_OTHER:14,TIME_NIGHT:10},\
 RESC_3I_MARIANAS_WITH_LASERS:{TIME_PRIME:18,TIME_OTHER:14,TIME_NIGHT:10},\
@@ -88,6 +91,7 @@ PRICE_LIST[AFFILIATION_PRIVATE] = {\
 RESC_LEICA_SP5:{TIME_PRIME:132,TIME_OTHER:102,TIME_NIGHT:75},\
 RESC_LEICA_SP5_MP:{TIME_PRIME:132,TIME_OTHER:102,TIME_NIGHT:75},\
 RESC_LEICA_SP5_HCS:{TIME_PRIME:132,TIME_OTHER:102,TIME_NIGHT:75},\
+RESC_LEICA_SP8_STED:{TIME_PRIME:132,TIME_OTHER:102,TIME_NIGHT:75},\
 RESC_ZEISS_LSM_700:{TIME_PRIME:108,TIME_OTHER:84,TIME_NIGHT:60},\
 RESC_ZEISS_LS_Z1:{TIME_PRIME:108,TIME_OTHER:84,TIME_NIGHT:60},\
 RESC_3I_MARIANAS_WITH_LASERS:{TIME_PRIME:108,TIME_OTHER:84,TIME_NIGHT:60},\
@@ -136,10 +140,14 @@ class BookedReportProcessorDialog(Tkinter.Frame):
 
         self.vin1 = StringVar()
         self.vin1.set("INPUT FILE NOT SET")
+        self.vin2 = StringVar()
+        self.vin2.set("USER FILE NOT SET")
 
         # define buttons
         Tkinter.Button(self, text='Select report file', command=self.askinputfile1).pack(**button_opt)
         Tkinter.Label(self, textvariable=self.vin1).pack(**button_opt)
+        Tkinter.Button(self, text='Select user file', command=self.askinputfile2).pack(**button_opt)
+        Tkinter.Label(self, textvariable=self.vin2).pack(**button_opt)
 
         Tkinter.Button(self, text="Split report", command=self.startconversion).pack()
 
@@ -154,11 +162,16 @@ class BookedReportProcessorDialog(Tkinter.Frame):
         filename = tkFileDialog.askopenfilename(**self.file_opt)
         self.vin1.set(filename)
 
+    def askinputfile2(self):
+        filename = tkFileDialog.askopenfilename(**self.file_opt)
+        self.vin2.set(filename)
+
     def startconversion(self):
         print self.vin1.get()
         csvFile = self.vin1.get()
+        userFile = self.vin2.get()
 
-        processor = BookedReportProcessor(csvFile)
+        processor = BookedReportProcessor(csvFile,userFile)
         processor.process()
 
         # if self.converter != None:
@@ -172,11 +185,24 @@ def next_weekday(d, weekday):
 
 class BookedReportProcessor:
 
-    def __init__(self, csvFile):
+    def __init__(self, csvFile, userFile):
         self.csvFile = csvFile
         head,tail = os.path.splitext(csvFile)
         self.csvFileOut = head + "_split" + tail
         #print self.csvFileOut
+
+        self.remitAreaCodes = {}
+        reader=unicode_csv_reader(open(userFile))
+        for row in reader:
+            # skip empty rows
+            if len(row) == 0:
+                continue
+            lastName = row[0]
+            firstName = row[1]
+            user = firstName + " " + lastName
+
+            rec = row[4]
+            self.remitAreaCodes[user] = rec
 
         # remove BOM
         # http://stackoverflow.com/questions/8898294/convert-utf-8-with-bom-to-utf-8-with-no-bom-in-python
@@ -265,13 +291,29 @@ class BookedReportProcessor:
             affiliation = AFFILIATION_ACADEMIC
         #print resource, start, end, affiliation, overtime
 
+        # 20170612: there is problem in the database which throws PI, WBS and Remit area codes off.
+        # We have to read PI and WBS from the Account field
+        account = row[H_ACCOUNT]
+        #print account
+        if account == "":
+            print "ERROR: empty account. "
+            pprint(row)
+            print
+            return
+
+        pi,wbs = account.split("_")
+        row[H_WBS] = wbs
+        user = row[H_USER]
+        row[H_REMIT_AREA_CODE] = self.remitAreaCodes[user]
+
         # convert PI email to readable name
-        pi = row[H_PI]
+        #pi = row[H_PI]
         pi = pi.replace("@helsinki.fi","")
         pi = pi.replace("@mappi.helsinki.fi","")
         pi = pi[pi.rfind(".")+1:]
         pi = pi.title()
         row[H_PI] = pi
+
 
         # check if 3I Marianas is booked with lasers
         if resource == RESC_3I_MARIANAS:
@@ -414,6 +456,11 @@ class BookedReportProcessor:
         sorted_keys = sorted(self.content.keys())
         for k in sorted_keys:
             sections = self.split_reservation(self.content[k])
+            if sections == None:
+                print "ERROR: no sections found"
+                pprint(self.content[k])
+                print
+                continue
             for s in sections:
                 self.print_reservation(s,output)
         output.close()
@@ -429,12 +476,14 @@ if __name__=='__main__':
 
     parser = OptionParser(usage=usage)
     parser.add_option('-i', '--input', help="Input report.")
+    parser.add_option('-u', '--user_list', help="User list.")
     options, args = parser.parse_args()
 
     # use command line arguments, if they were given
     if options.input:
         csvFile = options.input
-        processor = BookedReportProcessor(csvFile)
+        userFile = options.user_list
+        processor = BookedReportProcessor(csvFile, userFile)
         processor.process()
     else:
         root = Tkinter.Tk()
