@@ -53,6 +53,7 @@ H_AFFILIATION = "Affiliation type"
 H_LASERS_NONE = "Laser-None"
 H_OVERTIME = "Overtime"
 H_RESERVATION_ID = "ReferenceNumber"
+H_NO_BILLING = "No billing"
 
 # these headers are defined for adding pricing data
 H_SECTION_BEGIN = "Section begin"
@@ -437,6 +438,8 @@ class BookedReportProcessor:
         # add pricing info to sections
         for section in sections:
             price_per_hour = PRICE_LIST[affiliation][resource][section[H_PRICE_CATEGORY]]
+            if section[H_NO_BILLING] == "1":
+                price_per_hour = 0
             section[H_PRICE_PER_HOUR] = price_per_hour
             duration = section[H_SECTION_END] - section[H_SECTION_BEGIN]
             if section[H_OVERTIME] == "1":
