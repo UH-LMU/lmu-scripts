@@ -13,10 +13,12 @@ def main():
     Script Editor -> File -> Open... export_lif_gui.py
     Script Editor -> Run
     """
+    print "opendialog"
     filename = OpenDialog("Choose LIF").getPath()
     if not filename:
         # user canceled dialog
         return
+    print "directorychooser"
     exportDir = DirectoryChooser("Choose export directory").getDirectory()
     if not exportDir:
         # user canceled dialog
@@ -26,5 +28,8 @@ def main():
 
     iterateLif(filename,exporter)
 
-if __name__ == "__main__":
+print __name__
+
+if __name__ in ("__main__", "__builtin__"):
+    print "main jee"
     main()

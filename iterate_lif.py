@@ -26,7 +26,7 @@ def iterateLif(filename,impProcessor):
     # reader external to the import process
     impReader = ImagePlusReader(process)
     for i in range(0, nseries):
-        print "%d/%d %s" % (i+1, nseries, process.getSeriesLabel(i))
+        print "iterateLif: %d/%d %s" % (i+1, nseries, process.getSeriesLabel(i))
 
         # activate series (same as checkbox in GUI)
         opts.setSeriesOn(i,True)
@@ -37,7 +37,8 @@ def iterateLif(filename,impProcessor):
         # read and process all images in series
         imps = impReader.openImagePlus()
         for imp in imps:
-            print imp.getTitle()
+            imp.setTitle("%s_%d_%d" % (imp.getTitle(),i+1,nseries))
+            print "iterateLif: " + imp.getTitle()
             try:
                 impProcessor.process(imp)
             finally:

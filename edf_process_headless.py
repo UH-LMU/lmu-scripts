@@ -8,29 +8,29 @@ from edf import EdfComplexWavelets, PostProcessing, Tools
 from edfgui import ExtendedDepthOfField, Parameters
 from imageware import Builder, ImageWare
 
-file_in = sys.argv[1]
-file_out = sys.argv[2]
+#file_in = sys.argv[1]
+#file_out = sys.argv[2]
 
-print file_in
-print file_out
-
-# 
-REAL_WAVELETS = 2
-COMPLEX_WAVELETS = 3
+#print file_in
+#print file_out
 
 # EDF parameters
-params = Parameters()
-params.setQualitySettings(params.QUALITY_HIGH)
-params.nScales = 10
+#params = Parameters()
+#params.setQualitySettings(params.QUALITY_HIGH)
+#params.nScales = 10
 
 # read input image
-imp = ImagePlus(file_in)
-print imp
+#imp = ImagePlus(file_in)
+#print imp
 
 #
 # this is a reproduction of method "process" in edfgui.ExtendedDepthOfField.
 #
-def process():
+def edfProcess(imp,params):
+
+    REAL_WAVELETS = 2
+    COMPLEX_WAVELETS = 3
+
     isExtended = False
     waveletMethod = params.edfMethod == REAL_WAVELETS \
         or params.edfMethod == COMPLEX_WAVELETS
@@ -83,12 +83,12 @@ def process():
 
 
 # process input
-output = process()
+#output = edfProcess(imp,params)
 
 # save output
-IJ.saveAsTiff(output,file_out)
+#IJ.saveAsTiff(output,file_out)
 
 # close images
-output.close()
-imp.close()
+#output.close()
+#imp.close()
 
